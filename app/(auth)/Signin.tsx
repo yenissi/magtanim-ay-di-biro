@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ImageBackground } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, Image, ImageBackground } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather'; // You need to install react-native-vector-icons
-import BackgroundImage from '../../assets/images/Grass.svg';
+import { Link } from 'expo-router';
 
 const Signin = () => {
   const [username, setUsername] = useState('');
@@ -12,14 +12,14 @@ const Signin = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
+
+
   return (
     <ImageBackground
-      source={BackgroundImage}
-      resizeMode="cover"
-      className="flex-1"
+      source={require('../../assets/images/Grass.png')}
+      style={{ flex: 1 }}
     >
       <View className="flex-1 justify-center items-center">
-        {/* Card Container */}
         <View className="bg-gray-100 rounded-2xl p-6 w-11/12 max-w-xl shadow-lg">
           <Text className="text-2xl font-bold text-center mb-4">
             Welcome Back!
@@ -62,10 +62,14 @@ const Signin = () => {
           </TouchableOpacity>
 
           {/* Footer */}
-          <Text className="text-sm text-center">
-            Don’t have an account?{' '}
-            <Text className="text-blue-500 underline">Create account</Text>
-          </Text>
+          <View className=" text-center items-center justify-center flex-row">
+            <Text className='text-sm'>Don’t have an account?{' '}</Text>
+            <TouchableOpacity>
+              <Link href={{pathname: "/(auth)/Signup", params:{Signun:"SignUp"},}}>
+                <Text className="text-blue-500 underline">Create account</Text>
+              </Link>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     </ImageBackground>
