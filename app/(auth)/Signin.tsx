@@ -1,22 +1,52 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Image, ImageBackground } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather'; // You need to install react-native-vector-icons
-import { Link } from 'expo-router';
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  ImageBackground,
+  Alert,
+} from "react-native";
+import Icon from "react-native-vector-icons/Feather";
+import { Link } from "expo-router";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { Firebase_Auth } from "@/firebaseConfig";
 
 const Signin = () => {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
   };
 
+  // 🔹 Sign-In Function
+  const handleSignIn = async () => {
+    if (!email || !password) {
+      Alert.alert("Error", "Please enter both email and password.");
+      return;
+    }
 
+    setLoading(true);
+    try {
+      const userCredential = await signInWithEmailAndPassword(
+        Firebase_Auth,
+        email,
+        password
+      );
+      const user = userCredential.user;
+      Alert.alert("Success", `Welcome back, ${user.email}!`);
+    } catch (error) {
+      Alert.alert("Login Failed", error.message);
+    }
+    setLoading(false);
+  };
 
   return (
     <ImageBackground
-      source={require('../../assets/images/Grass.png')}
+      source={require("../../assets/images/Grass.png")}
       style={{ flex: 1 }}
     >
       <View className="flex-1 justify-center items-center">
@@ -25,13 +55,15 @@ const Signin = () => {
             Welcome Back!
           </Text>
 
-          {/* Username Input */}
-          <Text className="text-lg mb-2">Username:</Text>
+          {/* Email Input */}
+          <Text className="text-lg mb-2">Email:</Text>
           <TextInput
             className="bg-yellow-200 rounded-lg p-4 mb-4"
-            placeholder="Enter your username"
-            value={username}
-            onChangeText={setUsername}
+            placeholder="Enter your email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={email}
+            onChangeText={setEmail}
           />
 
           {/* Password Input */}
@@ -49,7 +81,7 @@ const Signin = () => {
               className="absolute right-4 top-6 transform -translate-y-1/2"
             >
               <Icon
-                name={isPasswordVisible ? 'eye-off' : 'eye'}
+                name={isPasswordVisible ? "eye-off" : "eye"}
                 size={20}
                 color="#000"
               />
@@ -57,15 +89,26 @@ const Signin = () => {
           </View>
 
           {/* Sign-In Button */}
-          <TouchableOpacity className="bg-yellow-400 rounded-lg border border-black py-3 items-center mb-4 hover">
-            <Text className="font-bold text-lg">Sign In</Text>
+          <TouchableOpacity
+            className="bg-yellow-400 rounded-lg border border-black py-3 items-center mb-4"
+            onPress={handleSignIn}
+            disabled={loading}
+          >
+            <Text className="font-bold text-lg">
+              {loading ? "Signing In..." : "Sign In"}
+            </Text>
           </TouchableOpacity>
 
           {/* Footer */}
-          <View className=" text-center items-center justify-center flex-row">
-            <Text className='text-sm'>Don’t have an account?{' '}</Text>
+          <View className="text-center items-center justify-center flex-row">
+            <Text className="text-sm">Don’t have an account?{" "}</Text>
             <TouchableOpacity>
-              <Link href={{pathname: "/(auth)/Signup", params:{Signun:"SignUp"},}}>
+              <Link
+                href={{
+                  pathname: "/(auth)/Signup",
+                  params: { Signun: "SignUp" },
+                }}
+              >
                 <Text className="text-blue-500 underline">Create account</Text>
               </Link>
             </TouchableOpacity>
