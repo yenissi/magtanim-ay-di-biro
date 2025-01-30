@@ -72,7 +72,7 @@ const Signup = () => {
           {/* First Name & Last Name */}
           <View className="flex-row gap-2">
             <View className="flex-1">
-              <Text className="text-sm mb-2">Firstname:</Text>
+              <Text className="text-sm mb-2">First Name:</Text>
               <TextInput
                 className="bg-yellow-200 rounded-lg p-4 mb-4"
                 placeholder="Enter First Name"
@@ -81,7 +81,7 @@ const Signup = () => {
               />
             </View>
             <View className="flex-1">
-              <Text className="text-sm mb-2">Lastname:</Text>
+              <Text className="text-sm mb-2">Last Name:</Text>
               <TextInput
                 className="bg-yellow-200 rounded-lg p-4 mb-4"
                 placeholder="Enter Last Name"
