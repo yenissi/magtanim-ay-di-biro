@@ -1,6 +1,7 @@
 import { View, Text, ImageBackground, TextInput, TouchableOpacity, Alert } from "react-native";
 import React, { useState } from "react";
 import { StatusBar } from "react-native";
+import Icon from "react-native-vector-icons/Feather";
 import { Link } from "expo-router";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { ref, set } from "firebase/database";
@@ -15,6 +16,11 @@ const Signup = () => {
   const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
   const [gradeLevel, setGradeLevel] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [isPasswordVisible, setIsPasswordVisible] = useState(false);
+  
+  const togglePasswordVisibility = () => {
+    setIsPasswordVisible(!isPasswordVisible);
+  };
 
   // 🔹 Select School Function
   const handleSelectSchool = (value: string) => {
@@ -29,7 +35,7 @@ const Signup = () => {
   // 🔹 Signup Function
   const handleSignUp = async () => {
     if (!userEmail || !userpass || !userfname || !userlname || !selectedSchool || !gradeLevel) {
-      Alert.alert("Error", "Please fill out all fields.");
+      Alert.alert("Error!", "Please fill out all fields.");
       return;
     }
 
@@ -48,7 +54,7 @@ const Signup = () => {
         createdAt: new Date().toISOString(),
       });
 
-      Alert.alert("Success", "Account created successfully!");
+      Alert.alert("Success!", "Account created successfully!");
     } catch (error) {
       Alert.alert("Signup Failed", error.message);
     }
@@ -63,48 +69,61 @@ const Signup = () => {
         <View className="bg-gray-100 rounded-2xl p-6 w-11/12 max-w-xl shadow-lg">
           <Text className="text-2xl font-bold text-center mb-4">Create Account</Text>
 
-          {/* Email Input */}
-          <Text className="text-sm mb-2">Email:</Text>
-          <TextInput
-            className="bg-yellow-200 rounded-lg p-4 mb-4"
-            placeholder="Enter your email"
-            keyboardType="email-address"
-            autoCapitalize="none"
-            value={userEmail}
-            onChangeText={setUserEmail}
-          />
-
           {/* First Name & Last Name */}
-          <View className="items-center flex-row gap-2">
-            <View className="flex-col">
+          <View className="flex-row gap-2">
+            <View className="flex-1">
               <Text className="text-sm mb-2">Firstname:</Text>
               <TextInput
                 className="bg-yellow-200 rounded-lg p-4 mb-4"
-                placeholder="Enter Firstname"
+                placeholder="Enter First Name"
                 value={userfname}
                 onChangeText={setUserfname}
               />
             </View>
-            <View className="flex-col">
+            <View className="flex-1">
               <Text className="text-sm mb-2">Lastname:</Text>
               <TextInput
                 className="bg-yellow-200 rounded-lg p-4 mb-4"
-                placeholder="Enter Lastname"
+                placeholder="Enter Last Name"
                 value={userlname}
                 onChangeText={setUserlname}
               />
             </View>
           </View>
 
-          {/* Password Input */}
-          <Text className="text-sm mb-2">Password:</Text>
+          {/* Email Input */}
+          <Text className="text-sm mb-2">Email:</Text>
           <TextInput
             className="bg-yellow-200 rounded-lg p-4 mb-4"
-            secureTextEntry={true}
-            placeholder="Enter Password"
-            value={userpass}
-            onChangeText={setUserpass}
+            placeholder="Enter Email"
+            keyboardType="email-address"
+            autoCapitalize="none"
+            value={userEmail}
+            onChangeText={setUserEmail}
           />
+
+          {/* Password Input */}
+          <Text className="text-sm mb-2">Password:</Text>
+          <View className="relative">
+            <TextInput
+              className="bg-yellow-200 rounded-lg p-4 mb-4 pr-12"
+              secureTextEntry={!isPasswordVisible}
+              placeholder="Enter Password"
+              value={userpass}
+              onChangeText={setUserpass}
+            />
+            <TouchableOpacity
+              onPress={togglePasswordVisibility}
+              className="absolute right-4 top-7 -translate-y-1/2"
+            >
+              <Icon
+                name={isPasswordVisible ? "eye-off" : "eye"}
+                size={20}
+                color="#000"
+              />
+            </TouchableOpacity>
+          </View>
+
 
           {/* Grade Level Selection */}
           <Text className="text-sm mb-2">Grade Level:</Text>
@@ -125,8 +144,8 @@ const Signup = () => {
           {/* School Selection */}
           <Text className="text-sm mb-2 mt-4">School:</Text>
           {[
-            { label: "CCES - Calauan Central", value: "CCES" },
-            { label: "BCES - Balayhangin Central", value: "BCES" },
+            { label: "CCES - Calauan Central Elementary School", value: "CCES" },
+            { label: "BES - Balayhangin Elementary School", value: "BCES" },
           ].map((school) => (
             <TouchableOpacity
               key={school.value}
@@ -134,15 +153,14 @@ const Signup = () => {
               onPress={() => handleSelectSchool(school.value)}
             >
               <View
-                className={`w-5 h-5 rounded-full border-2 border-gray-600 mr-3 justify-center items-center ${
-                  selectedSchool === school.value ? "bg-blue-500 border-blue-500" : ""
+                className={`w-5 h-5 rounded-full border-2 mr-3 ${
+                  selectedSchool === school.value ? "bg-green-500 border-gray-600" : "border-gray-600"
                 }`}
-              >
-                {selectedSchool === school.value && <View className="w-3 h-3 rounded-full bg-white" />}
-              </View>
+              />
               <Text className="text-lg">{school.label}</Text>
             </TouchableOpacity>
           ))}
+
 
           {/* Signup Button */}
           <TouchableOpacity
@@ -157,7 +175,7 @@ const Signup = () => {
           <TouchableOpacity className="flex-row mt-4 items-center justify-center">
             <Text className="text-sm text-center mr-1">Already have an account?</Text>
             <Link href={{ pathname: "/(auth)/Signin", params: { Signin: "SignIn" } }}>
-              <Text className="text-sm text-center text-blue-500 underline">Login</Text>
+              <Text className="text-sm text-center text-blue-500 underline">Log In</Text>
             </Link>
           </TouchableOpacity>
         </View>

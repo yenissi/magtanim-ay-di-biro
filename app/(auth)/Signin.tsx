@@ -78,7 +78,7 @@ const Signin = () => {
             />
             <TouchableOpacity
               onPress={togglePasswordVisibility}
-              className="absolute right-4 top-6 transform -translate-y-1/2"
+              className="absolute right-4 top-7 transform -translate-y-1/2"
             >
               <Icon
                 name={isPasswordVisible ? "eye-off" : "eye"}
