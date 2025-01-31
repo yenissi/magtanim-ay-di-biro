@@ -11,12 +11,15 @@ import Icon from "react-native-vector-icons/Feather";
 import { Link } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Firebase_Auth } from "@/firebaseConfig";
+import { useRouter } from "expo-router";
+import { getDatabase, ref, get } from "firebase/database"; 
 
 const Signin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
 
   const togglePasswordVisibility = () => {
     setIsPasswordVisible(!isPasswordVisible);
@@ -31,13 +34,27 @@ const Signin = () => {
 
     setLoading(true);
     try {
-      const userCredential = await signInWithEmailAndPassword(
-        Firebase_Auth,
-        email,
-        password
-      );
-      const user = userCredential.user;
-      Alert.alert("Success", `Welcome back, ${user.email}!`);
+    const userCredential = await signInWithEmailAndPassword(Firebase_Auth, email, password);
+    const user = userCredential.user;
+    const uid = user.uid;
+
+    // 🔹 Fetch all user details from Firebase Realtime Database
+    const db = getDatabase();
+    const userRef = ref(db, `users/${uid}`);
+    const snapshot = await get(userRef);
+
+    if (snapshot.exists()) {
+      const userData = snapshot.val(); // ✅ Get full user data object
+
+      // 🔹 Navigate to Main.tsx and pass all user data
+      router.push({
+        pathname: "/Main",
+        params: { ...userData, uid }, // Pass all user data as params
+      });
+
+    } else {
+      Alert.alert("Error", "User data not found.");
+    }
     } catch (error) {
       Alert.alert("Login Failed", error.message);
     }

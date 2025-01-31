@@ -14,7 +14,7 @@ const Stack = createStackNavigator();
 export default function Index() {
   return (
     <SafeAreaView className='h-full bg-green-400'>
-      <StatusBar backgroundColor="#fff" barStyle={'dark-content'}/>
+      <StatusBar barStyle={'dark-content'}/>
       <ScrollView contentContainerStyle={{ height: '100%' }}>
           <Signin />
       </ScrollView>
