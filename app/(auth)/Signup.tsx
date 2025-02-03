@@ -52,6 +52,14 @@ const Signup = () => {
         gradeLevel: gradeLevel,
         school: selectedSchool,
         createdAt: new Date().toISOString(),
+
+        // ✅ Game Data (Newly Added)
+        level: 1, // Starting level
+        money: 100, // Starting money
+        missions: [], // Empty missions list
+        shopitems: [], // Placeholder for future items
+        useritems: [], // Placeholder for future items
+
       });
 
       Alert.alert("Success!", "Account created successfully!");
