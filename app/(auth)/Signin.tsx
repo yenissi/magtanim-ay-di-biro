@@ -6,13 +6,13 @@ import {
   TouchableOpacity,
   ImageBackground,
   Alert,
+  StatusBar,
 } from "react-native";
 import Icon from "react-native-vector-icons/Feather";
-import { Link } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
+import { getDatabase, ref, get } from "firebase/database";
 import { Firebase_Auth } from "@/firebaseConfig";
-import { useRouter } from "expo-router";
-import { getDatabase, ref, get } from "firebase/database"; 
 
 const Signin = () => {
   const [email, setEmail] = useState("");
@@ -21,58 +21,73 @@ const Signin = () => {
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  const togglePasswordVisibility = () => {
-    setIsPasswordVisible(!isPasswordVisible);
-  };
-
-  // 🔹 Sign-In Function
   const handleSignIn = async () => {
-    if (!email || !password) {
+    if (!email.trim() || !password.trim()) {
       Alert.alert("Error", "Please enter both email and password.");
       return;
     }
 
     setLoading(true);
     try {
-    const userCredential = await signInWithEmailAndPassword(Firebase_Auth, email, password);
-    const user = userCredential.user;
-    const uid = user.uid;
+      const userCredential = await signInWithEmailAndPassword(
+        Firebase_Auth,
+        email.trim(),
+        password
+      );
+      const user = userCredential.user;
+      
+      const db = getDatabase();
+      const userRef = ref(db, `users/${user.uid}`);
+      const snapshot = await get(userRef);
+      
+      if (!snapshot.exists()) {
+        Alert.alert("Error", "User account not found. Please sign up first.");
+        return;
+      }
 
-    // 🔹 Fetch all user details from Firebase Realtime Database
-    const db = getDatabase();
-    const userRef = ref(db, `users/${uid}`);
-    const snapshot = await get(userRef);
-
-    if (snapshot.exists()) {
-      const userData = snapshot.val(); // ✅ Get full user data object
-
-      // 🔹 Navigate to Main.tsx and pass all user data
+      const userData = snapshot.val();
+      
       router.push({
         pathname: "/Main",
-        params: { ...userData, uid }, // Pass all user data as params
+        params: {
+          ...userData,
+          uid: user.uid,
+        },
       });
-
-    } else {
-      Alert.alert("Error", "User data not found.");
+    } catch (error: any) {
+      let errorMessage = "An unexpected error occurred";
+      switch (error.code) {
+        case "auth/invalid-email":
+          errorMessage = "Invalid email address format";
+          break;
+        case "auth/user-not-found":
+          errorMessage = "No account found with this email";
+          break;
+        case "auth/wrong-password":
+          errorMessage = "Incorrect password";
+          break;
+        case "auth/too-many-requests":
+          errorMessage = "Too many failed attempts. Please try again later";
+          break;
+      }
+      Alert.alert("Login Failed", errorMessage);
+    } finally {
+      setLoading(false);
     }
-    } catch (error) {
-      Alert.alert("Login Failed", error.message);
-    }
-    setLoading(false);
   };
 
   return (
     <ImageBackground
-      source={require("../../assets/images/Grass.png")}
+      source={require("@/assets/images/Grass.png")}
       style={{ flex: 1 }}
     >
+      <StatusBar backgroundColor="#fff" barStyle="dark-content" />
       <View className="flex-1 justify-center items-center">
         <View className="bg-gray-100 rounded-2xl p-6 w-11/12 max-w-xl shadow-lg">
           <Text className="text-2xl font-bold text-center mb-4">
             Welcome Back!
           </Text>
 
-          {/* Email Input */}
           <Text className="text-lg mb-2">Email:</Text>
           <TextInput
             className="bg-yellow-200 rounded-lg p-4 mb-4"
@@ -83,7 +98,6 @@ const Signin = () => {
             onChangeText={setEmail}
           />
 
-          {/* Password Input */}
           <Text className="text-lg mb-2">Password:</Text>
           <View className="relative">
             <TextInput
@@ -94,7 +108,7 @@ const Signin = () => {
               onChangeText={setPassword}
             />
             <TouchableOpacity
-              onPress={togglePasswordVisibility}
+              onPress={() => setIsPasswordVisible(!isPasswordVisible)}
               className="absolute right-4 top-7 transform -translate-y-1/2"
             >
               <Icon
@@ -105,7 +119,6 @@ const Signin = () => {
             </TouchableOpacity>
           </View>
 
-          {/* Sign-In Button */}
           <TouchableOpacity
             className="bg-yellow-400 rounded-lg border border-black py-3 items-center mb-4"
             onPress={handleSignIn}
@@ -116,19 +129,11 @@ const Signin = () => {
             </Text>
           </TouchableOpacity>
 
-          {/* Footer */}
           <View className="text-center items-center justify-center flex-row">
-            <Text className="text-sm">Don’t have an account?{" "}</Text>
-            <TouchableOpacity>
-              <Link
-                href={{
-                  pathname: "/(auth)/Signup",
-                  params: { Signun: "SignUp" },
-                }}
-              >
-                <Text className="text-blue-500 underline">Create account</Text>
-              </Link>
-            </TouchableOpacity>
+            <Text className="text-sm">Don't have an account? </Text>
+            <Link href="/Signup">
+              <Text className="text-blue-500 underline">Create account</Text>
+            </Link>
           </View>
         </View>
       </View>
