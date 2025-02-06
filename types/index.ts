@@ -26,6 +26,7 @@ export interface UserData {
     description: string;
     price: number;
     type: string;
+    image?:any;
   }
   
   export interface GameStatistics {

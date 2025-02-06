@@ -3,6 +3,9 @@ import React from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import type { Mission } from '@/types';
+import { INITIAL_GAME_STATE } from '@/config/gameConfig';
+import { useState,useEffect } from 'react';
+
 
 interface MissionsModalProps {
   visible: boolean;
@@ -11,7 +14,37 @@ interface MissionsModalProps {
   onMissionComplete: (missionId: number) => void;
 }
 
-export const MissionsModal = ({ visible, onClose, missions, onMissionComplete }: MissionsModalProps) => {
+
+
+export const MissionsModal = ({ visible, onClose, onMissionComplete }: MissionsModalProps) => {
+  const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions);
+
+  useEffect(() => {
+    // Automatically sync missions from INITIAL_GAME_STATE
+    const updatedMissions = INITIAL_GAME_STATE.missions.map(configMission => {
+      // Find existing mission in current state or use default state
+      const existingMission = missions.find(m => m.id === configMission.id);
+      
+      return existingMission ? {
+        ...configMission,
+        completed: existingMission.completed,
+        locked: existingMission.locked
+      } : configMission;
+    });
+
+    setMissions(updatedMissions);
+  }, [INITIAL_GAME_STATE.missions.length]);
+
+  const handleMissionComplete = (missionId: number) => {
+    const updatedMissions = missions.map(mission => 
+      mission.id === missionId 
+        ? { ...mission, completed: true } 
+        : mission
+    );
+    setMissions(updatedMissions);
+    onMissionComplete(missionId);
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 justify-center items-center bg-black/50">
@@ -27,7 +60,7 @@ export const MissionsModal = ({ visible, onClose, missions, onMissionComplete }:
             {missions.map((mission) => (
               <View
                 key={mission.id}
-                className={`p-4 rounded-lg w-40 mr-4 ${
+                className={`p-4 rounded-lg w-auto mr-2 ${
                   mission.completed
                     ? 'bg-green-200'
                     : mission.locked
@@ -37,7 +70,7 @@ export const MissionsModal = ({ visible, onClose, missions, onMissionComplete }:
               >
                 <Text className="font-bold mb-2">{mission.title}</Text>
                 <Text className="text-gray-600 mb-2">{mission.description}</Text>
-                <Text className="text-green-600 mb-2">Reward: ${mission.reward}</Text>
+                <Text className="text-green-600 font-bold mb-4 text-sm">Reward: ₱{mission.reward}.00</Text>
                 {!mission.completed && !mission.locked && (
                   <TouchableOpacity
                     className="bg-yellow-400 p-2 rounded-lg items-center"

@@ -1,6 +1,6 @@
 // components/game/ShopModal.tsx
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, Alert,Image } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { getDatabase, ref, update, get } from 'firebase/database';
 import { SHOP_ITEMS } from '@/config/gameConfig';
@@ -56,16 +56,28 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
           <ScrollView horizontal>
             <View className="flex-row gap-4">
               {SHOP_ITEMS.map((item) => (
-                <View key={item.id} className="bg-white rounded-lg p-4 w-40">
+                <View key={item.id} className="bg-yellow-200 rounded-lg p-4 w-40 h-[220px]">
+                  {item.image && (
+                    <Image 
+                      source={item.image} 
+                      className="w-16 h-16 self-center mb-2" 
+                      resizeMode="contain" 
+                    />
+                  )}
                   <Text className="font-bold mb-2">{item.title}</Text>
-                  <Text className="text-gray-600 mb-2">{item.description}</Text>
-                  <Text className="text-green-600 font-bold mb-4">${item.price}</Text>
-                  <TouchableOpacity
-                    className="bg-yellow-400 p-2 rounded-lg items-center"
-                    onPress={() => handlePurchase(item.id, item.price)}
-                  >
-                    <Text className="font-bold">Buy</Text>
-                  </TouchableOpacity>
+                  <Text className="text-gray-600 mb-2 text-sm">{item.description}</Text>
+                  <Text className="text-green-600 font-bold mb-4 text-sm">₱{item.price}.00</Text>
+                    <View className='flex-row items-center gap-2'>
+                      {/* Button to purchase item */}
+                      <TouchableOpacity className="bg-green-400 rounded-lg p-2 w-20 items-center"
+                        onPress={() => handlePurchase(item.id, item.price)}>
+                        <Text className="font-bold">Buy</Text>
+                      </TouchableOpacity>
+                      {/* Informations in Items */}
+                      <TouchableOpacity className='p-1 rounded-lg bg-blue-300 items-center'>
+                        <AntDesign name='info' size={24} color={ "black"} />
+                      </TouchableOpacity>
+                    </View>
                 </View>
               ))}
             </View>

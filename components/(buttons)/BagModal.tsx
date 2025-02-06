@@ -28,7 +28,7 @@ export const BagModal = ({ visible, onClose, inventory }: BagModalProps) => {
             ) : (
               <View className="flex-row flex-wrap gap-4">
                 {inventory.map((item, index) => (
-                  <View key={`${item.id}-${index}`} className="bg-white rounded-lg p-4 w-40">
+                  <View key={`${item.id}-${index}`} className="bg-yellow-200 rounded-lg p-4 w-40">
                     <Text className="font-bold mb-2">{item.title}</Text>
                     <Text className="text-gray-600">{item.description}</Text>
                     <Text className="text-gray-500 mt-2">Type: {item.type}</Text>

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
-import { FontAwesome5, MaterialIcons } from '@expo/vector-icons';
+import { FontAwesome5, MaterialIcons, SimpleLineIcons } from '@expo/vector-icons';
 import { getAuth, signOut } from 'firebase/auth';
 import { useGameData } from '@/hooks/useGameData';
 import { ShopModal } from '../../components/(buttons)/ShopModal';
@@ -76,15 +76,14 @@ const Main = () => {
         {/* Top Bar */}
         <View className="flex-row justify-between p-4">
           <TouchableOpacity
-            className="flex-row items-center bg-orange-300 p-2 rounded-lg"
+            className="flex-row items-center bg-orange-300 p-2 rounded-lg border-2 border-black-400"
             onPress={() => setProfileVisible(true)}
           >
-            <FontAwesome5 name="user-alt" size={18} color="black" className="mr-2" />
+            <SimpleLineIcons name="user" size={22} color="black" className="p-2 mr-2 rounded-lg border border-black" />
             <View>
               <Text className="font-bold">{gameData?.firstName} {gameData?.lastName}</Text>
               <View className="flex-row items-center">
-                <MaterialIcons name="attach-money" size={18} color="black" />
-                <Text>{gameData?.money}</Text>
+                <Text>₱ {gameData?.money}.00</Text>
               </View>
             </View>
           </TouchableOpacity>
@@ -94,11 +93,11 @@ const Main = () => {
             onPress={() => setTriviaVisible(true)}
           >
             <Image 
-              source={require('@/assets/images/trivia1.png')}
-              className="w-12 h-12"
+              source={require('@/assets/images/cloud.png')}
+              className="w-16 h-16"
               resizeMode='contain'
             />
-            <Text className='text-sm'>Trivia</Text>
+            <Text className='text-sm absolute mt-12'>Trivia</Text>
           </TouchableOpacity>
 
         </View>

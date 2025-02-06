@@ -18,7 +18,30 @@ export const INITIAL_GAME_STATE = {
         locked: false,
         completed: false,
       },
-      // Add more missions as needed
+      {
+        id: 3,
+        title: "Beginner Farmer",
+        description: "Complete your first harvest",
+        reward: 50,
+        locked: false,
+        completed: false,
+      },
+      {
+        id: 4,
+        title: "Green Thumb",
+        description: "Grow 5 plants",
+        reward: 100,
+        locked: false,
+        completed: false,
+      },
+      {
+        id: 5,
+        title: "Beginner Farmer",
+        description: "Complete your first harvest",
+        reward: 50,
+        locked: false,
+        completed: false,
+      },
     ],
     inventory: [],
     statistics: {
@@ -35,6 +58,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 20,
       type: "tool",
+      image: require('@/assets/images/asarol1.png'),
     },
     {
       id: 2,
@@ -42,6 +66,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 50,
       type: "tool",
+      image: require('@/assets/images/kalaykay.png'),
     },
     {
       id: 3,
@@ -49,6 +74,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 50,
       type: "tool",
+      image: require('@/assets/images/itak.png'),
     },
     {
       id: 4,
@@ -56,6 +82,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 20,
       type: "tool",
+      image: require('@/assets/images/regadera.png'),
     },
     {
       id: 5,
@@ -63,6 +90,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 50,
       type: "tool",
+      image: require('@/assets/images/kalaykay.png'),
     },
     {
       id: 6,
@@ -70,6 +98,7 @@ export const INITIAL_GAME_STATE = {
       description: "Simple Crop",
       price: 50,
       type: "crop",
+      image: require('@/assets/images/sibuyas.png'),
     },
     {
       id: 7,
@@ -77,6 +106,7 @@ export const INITIAL_GAME_STATE = {
       description: "Basic Tool",
       price: 50,
       type: "tree",
+      image: require('@/assets/images/mangga.png'),
     },
     {
       id: 8,
@@ -84,6 +114,7 @@ export const INITIAL_GAME_STATE = {
       description: "Simple Crop ",
       price: 50,
       type: "crop",
+      image: require('@/assets/images/karot.png'),
     },
     {
       id: 9,
@@ -91,12 +122,14 @@ export const INITIAL_GAME_STATE = {
       description: "Simple Flower",
       price: 50,
       type: "tree",
+      image: require('@/assets/images/gumamela.png'),
     },
-    {
-      id: 10,
-      title: "Chemical Pesticide",
-      description: "Basic Tool",
-      price: 50,
-      type: "tool",
-    },
+    // {
+    //   id: 10,
+    //   title: "Chemical Pesticide",
+    //   description: "Basic Tool",
+    //   price: 50,
+    //   type: "tool",
+    //   image: require('@/assets/images/chemical.png'),
+    // },
   ];
