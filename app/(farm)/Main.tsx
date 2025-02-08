@@ -18,6 +18,7 @@ import { BagModal } from '../../components/(buttons)/BagModal';
 import { MissionsModal } from '../../components/(buttons)/MissionsModal';
 import { ProfileModal } from '../../components/(buttons)/ProfileModal';
 import  TriviaModal  from '../../components/(buttons)/TriviaModal';
+import { Audio } from 'expo-av';
 
 const Main = () => {
   const params = useLocalSearchParams();
@@ -30,6 +31,7 @@ const Main = () => {
   const [profileVisible, setProfileVisible] = useState(false);
   const [triviaVisible, setTriviaVisible] = useState(false);
 
+
   useEffect(() => {
     const lockOrientation = async () => {
       await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
@@ -40,41 +42,34 @@ const Main = () => {
     };
   }, []);
 
-  const handleSignOut = async () => {
+  const playSound = async (soundFile) => {
     try {
-      const auth = getAuth();
-      await signOut(auth);
-      router.replace('/Signin');
+      const { sound } = await Audio.Sound.createAsync(soundFile);
+      await sound.playAsync();
     } catch (error) {
-      console.error('Sign out error:', error);
+      console.error('Failed to play sound:', error);
     }
   };
 
-  if (loading) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text>Loading...</Text>
-      </View>
-    );
+const handleSignOut = async () => {
+  try {
+    const auth = getAuth();
+    await signOut(auth);
+    router.replace('/Signin');
+  } catch (error) {
+    console.error('Sign out error:', error);
   }
-
-  if (error) {
-    return (
-      <View className="flex-1 justify-center items-center">
-        <Text>Error: {error}</Text>
-      </View>
-    );
-  }
+};
 
   return (
     <ImageBackground 
-      source={require('@/assets/images/Mainbg.png')} 
+      source={require('@/assets/images/maingrass.png')} 
       className="flex-1"
     >
       <StatusBar hidden />
       <View className="flex-1">
         {/* Top Bar */}
-        <View className="flex-row justify-between p-4">
+        <View className="flex-row justify-between p-1">
           <TouchableOpacity
             className="flex-row items-center bg-orange-300 p-2 rounded-lg border-2 border-black-400"
             onPress={() => setProfileVisible(true)}
@@ -89,21 +84,21 @@ const Main = () => {
           </TouchableOpacity>
 
           <TouchableOpacity
-            className="items-center"
-            onPress={() => setTriviaVisible(true)}
+            className="items-center "
+            onPress={() => { setTriviaVisible(true); playSound(require('@/assets/sound/sound.mp3')); }}
           >
             <Image 
               source={require('@/assets/images/cloud.png')}
-              className="w-16 h-16"
+              className="w-16 h-16 "
               resizeMode='contain'
             />
-            <Text className='text-sm absolute mt-12'>Trivia</Text>
+            <Text className='text-sm absolute mt-12 text-white font-medium'>Trivia</Text>
           </TouchableOpacity>
 
         </View>
 
         {/* Game Controls */}
-        <View className="absolute bottom-4 right-2 space-y-4 gap-3">
+        <View className="absolute bottom-2 right-3 space-y-4 gap-3">
 
           <TouchableOpacity 
             className="items-center"
@@ -113,7 +108,7 @@ const Main = () => {
               source={require('@/assets/images/shop.png')}
               className="w-12 h-12"
             />
-            <Text className='text-sm'>Shop</Text>
+            <Text className='text-sm text-white font-medium absolute mt-10'>Shop</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -122,9 +117,9 @@ const Main = () => {
           >
             <Image 
               source={require('@/assets/images/bag.png')}
-              className="w-12 h-12"
+              className="w-12 h-12 mt-3"
             />
-            <Text className='text-sm'>Bag</Text>
+            <Text className='text-sm text-white font-medium absolute mt-14'>Bag</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
@@ -133,10 +128,10 @@ const Main = () => {
           >
             <Image 
               source={require('@/assets/images/missions1.png')}
-              className="w-12 h-12"
+              className="w-12 h-12 mt-3"
               resizeMode='contain'
             />
-            <Text className='text-sm'>Missions</Text>
+            <Text className='text-sm text-white font-medium'>Mission</Text>
           </TouchableOpacity>
         </View>
 
@@ -181,5 +176,6 @@ const Main = () => {
     </ImageBackground>
   );
 };
+
 
 export default Main;

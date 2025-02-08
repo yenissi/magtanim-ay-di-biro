@@ -1,6 +1,7 @@
-import React from "react";
+import React,{ useEffect,useState } from "react";
 import { Modal, View, Text, Pressable, ScrollView, Image } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
+import { Audio } from 'expo-av';
 
 interface TriviaModalProps {
   visible: boolean;
@@ -8,11 +9,55 @@ interface TriviaModalProps {
 }
 
 const TriviaModal = ({ visible, onClose }: TriviaModalProps ) => {
+  const [buttonSound, setButtonSound] = useState<Audio.Sound | null>(null);
+  // Load Sound Effect
+  useEffect(() => {
+    let soundInstance: Audio.Sound | null = null;
+
+    const loadSound = async () => {
+      try {
+        const { sound } = await Audio.Sound.createAsync(
+          require('@/assets/sound/sound.mp3')
+        );
+        soundInstance = sound;
+        setButtonSound(sound);
+      } catch (error) {
+        console.error("Failed to load sound:", error);
+      }
+    };
+
+    loadSound();
+
+    return () => {
+      if (soundInstance) {
+        soundInstance.unloadAsync();
+      }
+    };
+  }, []);
+
+  // Play Sound Effect
+  const playSound = async () => {
+    if (!buttonSound) {
+      console.warn("Sound not loaded yet!");
+      return;
+    }
+    try {
+      await buttonSound.replayAsync();
+    } catch (error) {
+      console.error("Error playing sound:", error);
+    }
+  };
+
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 justify-center items-center bg-black/50">
         <View className="bg-orange-300 rounded-lg m-8 w-10/12 max-h-[85%]">
-          <Pressable className="p-2 flex-row items-center justify-center border border-b rounded-t-lg" onPress={onClose}>
+          <Pressable className="p-2 flex-row items-center justify-center border border-b rounded-t-lg" 
+          onPress={async () => {
+            await playSound();
+            onClose();
+          }}
+          >
             <Text className="text-lg font-bold text-center pt-4">Trivia</Text>
             <AntDesign name="close" size={20} color="black" className="p-2 absolute right-3 top-3" />
           </Pressable>

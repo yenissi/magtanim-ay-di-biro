@@ -28,10 +28,17 @@ export const BagModal = ({ visible, onClose, inventory }: BagModalProps) => {
             ) : (
               <View className="flex-row flex-wrap gap-4">
                 {inventory.map((item, index) => (
-                  <View key={`${item.id}-${index}`} className="bg-yellow-200 rounded-lg p-4 w-40">
+                  <View key={`${item.id}-${index}`} className="bg-yellow-200 rounded-lg p-3 w-40">
                     <Text className="font-bold mb-2">{item.title}</Text>
                     <Text className="text-gray-600">{item.description}</Text>
-                    <Text className="text-gray-500 mt-2">Type: {item.type}</Text>
+                    <View className='flex-row items-center gap-1 mt-2'>
+                      <TouchableOpacity
+                        className=" text-white rounded-lg bg-green-400 p-2 w-[100%]"
+                        onPress={() => console.log(`Clicked on item ${item.title}`)}
+                      >
+                        <Text className='text-sm font-medium text-center'>Use</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 ))}
               </View>

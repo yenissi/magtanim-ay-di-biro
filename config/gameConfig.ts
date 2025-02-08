@@ -62,14 +62,6 @@ export const INITIAL_GAME_STATE = {
     },
     {
       id: 2,
-      title: "Kalaykay",
-      description: "Basic Tool",
-      price: 50,
-      type: "tool",
-      image: require('@/assets/images/kalaykay.png'),
-    },
-    {
-      id: 3,
       title: "Itak",
       description: "Basic Tool",
       price: 50,
@@ -77,7 +69,7 @@ export const INITIAL_GAME_STATE = {
       image: require('@/assets/images/itak.png'),
     },
     {
-      id: 4,
+      id: 3,
       title: "Regadera",
       description: "Basic Tool",
       price: 20,
@@ -85,15 +77,7 @@ export const INITIAL_GAME_STATE = {
       image: require('@/assets/images/regadera.png'),
     },
     {
-      id: 5,
-      title: "Kalaykay",
-      description: "Basic Tool",
-      price: 50,
-      type: "tool",
-      image: require('@/assets/images/kalaykay.png'),
-    },
-    {
-      id: 6,
+      id: 4,
       title: "Sibuyas",
       description: "Simple Crop",
       price: 50,
@@ -101,7 +85,7 @@ export const INITIAL_GAME_STATE = {
       image: require('@/assets/images/sibuyas.png'),
     },
     {
-      id: 7,
+      id: 5,
       title: "Mangga",
       description: "Basic Tool",
       price: 50,
@@ -109,7 +93,7 @@ export const INITIAL_GAME_STATE = {
       image: require('@/assets/images/mangga.png'),
     },
     {
-      id: 8,
+      id: 6,
       title: "Carrot",
       description: "Simple Crop ",
       price: 50,
@@ -117,12 +101,20 @@ export const INITIAL_GAME_STATE = {
       image: require('@/assets/images/karot.png'),
     },
     {
-      id: 9,
+      id: 7,
       title: "Gumamela",
       description: "Simple Flower",
       price: 50,
-      type: "tree",
+      type: "crop",
       image: require('@/assets/images/gumamela.png'),
+    },
+    {
+      id: 8,
+      title: "Lupa",
+      description: "Taniman ng mga Gulay at Prutas",
+      price: 10,
+      type: "tool",
+      image: require('@/assets/images/lupa.png'),
     },
     // {
     //   id: 10,
