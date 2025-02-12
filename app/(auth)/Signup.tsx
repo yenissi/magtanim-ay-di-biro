@@ -119,7 +119,7 @@ const Signup = () => {
       style={{ flex: 1 }}
     >
       <ScrollView>
-        <View className="flex-1 justify-center items-center py-8">
+        <View className="flex-1 justify-center items-center py-36">
           <View className="bg-gray-100 rounded-2xl p-6 w-11/12 max-w-xl shadow-lg">
             <Text className="text-2xl font-bold text-center mb-4">
               Create Account
@@ -203,16 +203,16 @@ const Signup = () => {
 
             {/* School Selection */} 
             <View className="mb-4">
-              <Text className="text-sm mb-2">Select a School:</Text>
-              {["Calauan", "Balayhangin"].map((school) => (
+              <Text className="text-sm mb-3">Select a School:</Text>
+              {["Calauan Central Elementary School", "Balayhangin Elementary School"].map((school) => (
                 <TouchableOpacity 
                   key={school} 
-                  className="flex-row items-center mb-4" 
+                  className="flex-row items-center mb-2" 
                   onPress={() => handleSelectSchool(school)}
                 >
                   <View 
                     className={`w-5 h-5 rounded-full border-2 mr-3 ${
-                      selectedSchool === school ? "bg-yellow-500" : "border-yellow-200"
+                      selectedSchool === school ? "bg-yellow-500" : "border-black"
                     }`} 
                   />
                   <Text>{school}</Text>
