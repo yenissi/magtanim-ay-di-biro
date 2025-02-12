@@ -17,13 +17,56 @@ import { Firebase_Auth } from "@/firebaseConfig";
 const Signin = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
+  // Email validation function
+  const validateEmail = (text: string) => {
+    setEmail(text);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(text)) {
+      setEmailError("Invalid email address.");
+    } else {
+      setEmailError("");
+    }
+  };
+
+  // Password validation function
+  const validatePassword = (text: string) => {
+    setPassword(text);
+    if (text.length < 6) {
+      setPasswordError("Invalid password.");
+    } else {
+      setPasswordError("");
+    }
+  };
+
   const handleSignIn = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert("Error", "Please enter both email and password.");
+    if (!email.trim() && !password.trim()) {
+      Alert.alert("Error Sign In", "Please enter both email and password.");
+      return;
+    }
+    if (!email.trim()) {
+      Alert.alert("Error Sign In", "Please enter email.");
+      return;
+    }
+    if (!password.trim()) {
+      Alert.alert("Error Sign In", "Please enter password.");
+      return;
+    }
+    if (emailError && passwordError) {
+      Alert.alert("Error Sign In", "Please enter a valid email and password.");
+      return;
+    }
+    if (emailError) {
+      Alert.alert("Error Sign In", "Please enter a valid email.");
+      return;
+    }
+    if (passwordError) {
+      Alert.alert("Error Sign In", "Please enter a valid password.");
       return;
     }
 
@@ -35,18 +78,18 @@ const Signin = () => {
         password
       );
       const user = userCredential.user;
-      
+
       const db = getDatabase();
       const userRef = ref(db, `users/${user.uid}`);
       const snapshot = await get(userRef);
-      
+
       if (!snapshot.exists()) {
-        Alert.alert("Error", "User account not found. Please sign up first.");
+        Alert.alert("Error Sign In", "User account not found. Please sign up first.");
         return;
       }
 
       const userData = snapshot.val();
-      
+
       router.push({
         pathname: "/Main",
         params: {
@@ -88,28 +131,37 @@ const Signin = () => {
             Welcome Back!
           </Text>
 
+          {/* Email Input */}
           <Text className="text-lg mb-2">Email:</Text>
           <TextInput
-            className="bg-yellow-200 rounded-lg p-4 mb-4"
+            className={`bg-yellow-200 rounded-lg p-4 mb-2 ${
+              emailError ? "border-red-500 border-2" : ""
+            }`}
             placeholder="Enter your email"
             keyboardType="email-address"
             autoCapitalize="none"
             value={email}
-            onChangeText={setEmail}
+            onChangeText={validateEmail}
           />
+          {emailError ? (
+            <Text className="text-red-500 text-sm mb-3">{emailError}</Text>
+          ) : null}
 
+          {/* Password Input */}
           <Text className="text-lg mb-2">Password:</Text>
           <View className="relative">
             <TextInput
-              className="bg-yellow-200 rounded-lg p-4 mb-7 pr-12"
+              className={`bg-yellow-200 rounded-lg p-4 mb-2 pr-12 ${
+                passwordError ? "border-red-500 border-2" : ""
+              }`}
               placeholder="Enter your password"
               secureTextEntry={!isPasswordVisible}
               value={password}
-              onChangeText={setPassword}
+              onChangeText={validatePassword}
             />
             <TouchableOpacity
               onPress={() => setIsPasswordVisible(!isPasswordVisible)}
-              className="absolute right-4 top-7 transform -translate-y-1/2"
+              className="absolute right-4 top-4"
             >
               <Icon
                 name={isPasswordVisible ? "eye-off" : "eye"}
@@ -118,9 +170,13 @@ const Signin = () => {
               />
             </TouchableOpacity>
           </View>
+          {passwordError ? (
+            <Text className="text-red-500 text-sm mb-3">{passwordError}</Text>
+          ) : null}
 
+          {/* Sign In Button */}
           <TouchableOpacity
-            className="bg-yellow-400 rounded-lg border border-black py-3 items-center mb-4"
+            className="bg-yellow-400 rounded-lg border border-black py-3 items-center mb-4 mt-4"
             onPress={handleSignIn}
             disabled={loading}
           >
@@ -129,6 +185,7 @@ const Signin = () => {
             </Text>
           </TouchableOpacity>
 
+          {/* Signup Link */}
           <View className="text-center items-center justify-center flex-row">
             <Text className="text-sm">Don't have an account? </Text>
             <Link href="/Signup">
