@@ -1,6 +1,6 @@
 export const INITIAL_GAME_STATE = {
     level: 1,
-    money: 100,
+    money: 15000,
     missions: [
       {
         id: 1,
@@ -108,14 +108,14 @@ export const INITIAL_GAME_STATE = {
       type: "crop",
       image: require('@/assets/images/gumamela.png'),
     },
-    {
-      id: 8,
-      title: "Lupa",
-      description: "Taniman ng mga Gulay at Prutas",
-      price: 10,
-      type: "tool",
-      image: require('@/assets/images/lupa.png'),
-    },
+    // {
+    //   id: 8,
+    //   title: "Lupa",
+    //   description: "Taniman ng mga Gulay at Prutas",
+    //   price: 10,
+    //   type: "tool",
+    //   image: require('@/assets/images/lupa.png'),
+    // },
     // {
     //   id: 10,
     //   title: "Chemical Pesticide",
