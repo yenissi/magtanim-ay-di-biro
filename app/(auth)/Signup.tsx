@@ -19,8 +19,12 @@ import { INITIAL_GAME_STATE } from "@/config/gameConfig";
 const Signup = () => {
   const [userEmail, setUserEmail] = useState<string>("");
   const [password, setPassword] = useState<string>("");
+  const [emailError, setEmailError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
   const [userfname, setUserfname] = useState<string>("");
   const [userlname, setUserlname] = useState<string>("");
+  const [firstNameError, setFirstNameError] = useState('');
+  const [lastNameError, setLastNameError] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
   const [gradeLevel, setGradeLevel] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
@@ -39,29 +43,67 @@ const Signup = () => {
     setSelectedSchool(school);
   };
 
-  const validateInputs = () => {
-    if (!userEmail.trim() || !password.trim() || !userfname.trim() || !userlname.trim() || !selectedSchool || !gradeLevel) {
-      Alert.alert("Error", "Please fill out all fields.");
-      return false;
-    }
-    
+  // Email validation function
+  const validateEmail = (text: string) => {
+    setUserEmail(text);
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(userEmail)) {
-      Alert.alert("Error", "Please enter a valid email address.");
-      return false;
+    if (!emailRegex.test(text)) {
+      setEmailError("Enter valid email address.");
+    } else {
+      setEmailError("");
+    }
+  };
+
+  // Password validation function
+  const validatePassword = (text: string) => {
+    setPassword(text);
+    const passwordRegex = /^(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_])[A-Za-z\d@$!%*?&_]{6,}$/;
+    
+    if (!passwordRegex.test(text)) {
+      setPasswordError("Must be at least 6 characters. Include an uppercase letter [A-Z], a number [0-9], and a special character [@$!%*?&_].");
+    } else {
+      setPasswordError("");
+    }
+  };
+
+  const validateInputs = () => {
+    let isValid = true;
+
+    if (!userfname.trim() || userfname.length < 2) {
+      setFirstNameError("First name is required.");
+      isValid = false;
+    } else {
+      setFirstNameError("");
     }
 
-    if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters long.");
-      return false;
+    if (!userlname.trim() || userlname.length < 2) {
+      setLastNameError("Last name is required.");
+      isValid = false;
+    } else {
+      setLastNameError("");
     }
 
-    if (userfname.length < 2 || userlname.length < 2) {
-      Alert.alert("Error", "Names must be at least 2 characters long.");
-      return false;
+    if (!userEmail.trim()) {
+      setEmailError("Email is required.");
+      isValid = false;
+    }
+  
+    if (!password.trim()) {
+      setPasswordError("Password is required.");
+      isValid = false;
     }
 
-    return true;
+    if (!selectedSchool) {
+      Alert.alert("Error", "Please select a school.");
+      isValid = false;
+    }
+
+    if (!gradeLevel) {
+      Alert.alert("Error", "Please select a grade level.");
+      isValid = false;
+    }
+
+    return isValid;
   };
 
   const handleSignUp = async () => {
@@ -130,22 +172,38 @@ const Signup = () => {
               <View className="flex-1">
                 <Text className="text-sm mb-2">First Name:</Text>
                 <TextInput 
-                  className="bg-yellow-200 rounded-lg p-4 mb-4" 
+                  className={`bg-yellow-200 rounded-lg p-4 mb-1 ${
+                    firstNameError ? "border-red-500 border-2" : ""
+                  }`} 
                   placeholder="Enter First Name" 
                   value={userfname} 
-                  onChangeText={setUserfname}
+                  onChangeText={(text) => {
+                    setUserfname(text);
+                    if (text.trim().length > 1) setFirstNameError("");
+                  }}
                   autoCapitalize="words"
                 />
+                {firstNameError ? (
+                  <Text className="text-red-500 text-sm mb-3">{firstNameError}</Text>
+                ) : null}
               </View>
               <View className="flex-1">
                 <Text className="text-sm mb-2">Last Name:</Text>
                 <TextInput 
-                  className="bg-yellow-200 rounded-lg p-4 mb-4" 
+                  className={`bg-yellow-200 rounded-lg p-4 mb-1 ${
+                    lastNameError ? "border-red-500 border-2" : ""
+                  }`} 
                   placeholder="Enter Last Name" 
                   value={userlname} 
-                  onChangeText={setUserlname}
+                  onChangeText={(text) => {
+                    setUserlname(text);
+                    if (text.trim().length > 1) setLastNameError("");
+                  }}
                   autoCapitalize="words"
                 />
+                {lastNameError ? (
+                  <Text className="text-red-500 text-sm mb-3">{lastNameError}</Text>
+                ) : null}
               </View>
             </View>
 
@@ -153,25 +211,32 @@ const Signup = () => {
             <View>
               <Text className="text-sm mb-2">Email:</Text>
               <TextInput 
-                className="bg-yellow-200 rounded-lg p-4 mb-4" 
+                className={`bg-yellow-200 rounded-lg p-4 mb-2 ${
+                  emailError ? "border-red-500 border-2" : ""
+                }`}
                 placeholder="Enter Email" 
                 keyboardType="email-address" 
                 autoCapitalize="none"
                 value={userEmail} 
-                onChangeText={setUserEmail}
+                onChangeText={validateEmail}
               />
+              {emailError ? (
+                <Text className="text-red-500 text-sm mb-3">{emailError}</Text>
+              ) : null}
             </View>
 
             {/* Password Input */}
             <Text className="text-sm mb-2">Password:</Text>
             <View className="relative">
               <TextInput 
-                className="bg-yellow-200 rounded-lg p-4 mb-4 pr-12"
-                secureTextEntry={!isPasswordVisible}
+                className={`bg-yellow-200 rounded-lg p-4 mb-2 pr-12 ${
+                  passwordError ? "border-red-500 border-2" : ""
+                }`}
                 placeholder="Enter Password"
+                secureTextEntry={!isPasswordVisible}
                 value={password}
-                onChangeText={setPassword}
-                autoCapitalize="none"
+                onChangeText={validatePassword}
+
               />
               <TouchableOpacity 
                 onPress={togglePasswordVisibility} 
@@ -184,6 +249,9 @@ const Signup = () => {
                 />
               </TouchableOpacity>
             </View>
+            {passwordError ? (
+              <Text className="text-red-500 text-sm mb-3">{passwordError}</Text>
+            ) : null}
 
             {/* Grade Level Selection */}
             <Text className="text-sm mb-2">Grade Level:</Text>
@@ -229,7 +297,7 @@ const Signup = () => {
               disabled={loading}
             >
               <Text className="font-bold text-lg">
-                {loading ? "Creating Account..." : "Sign Up"}
+                {loading ? "Creating Account..." : "Create Account"}
               </Text>
             </TouchableOpacity>
 
@@ -239,7 +307,7 @@ const Signup = () => {
                 Already have an account?
               </Text>
               <Link href="/Signin">
-                <Text className="text-blue-500 underline">Sign In</Text>
+                <Text className="text-blue-500 underline">Log In</Text>
               </Link>
             </View>
           </View>

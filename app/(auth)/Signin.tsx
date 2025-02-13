@@ -44,31 +44,24 @@ const Signin = () => {
     }
   };
 
+  const validateInputs = () => {
+      let isValid = true;
+  
+      if (!email.trim()) {
+        setEmailError("Email is required.");
+        isValid = false;
+      }
+    
+      if (!password.trim()) {
+        setPasswordError("Password is required.");
+        isValid = false;
+      }
+  
+      return isValid;
+    };
+
   const handleSignIn = async () => {
-    if (!email.trim() && !password.trim()) {
-      Alert.alert("Error Sign In", "Please enter both email and password.");
-      return;
-    }
-    if (!email.trim()) {
-      Alert.alert("Error Sign In", "Please enter email.");
-      return;
-    }
-    if (!password.trim()) {
-      Alert.alert("Error Sign In", "Please enter password.");
-      return;
-    }
-    if (emailError && passwordError) {
-      Alert.alert("Error Sign In", "Please enter a valid email and password.");
-      return;
-    }
-    if (emailError) {
-      Alert.alert("Error Sign In", "Please enter a valid email.");
-      return;
-    }
-    if (passwordError) {
-      Alert.alert("Error Sign In", "Please enter a valid password.");
-      return;
-    }
+    if (!validateInputs()) return;
 
     setLoading(true);
     try {
@@ -181,7 +174,7 @@ const Signin = () => {
             disabled={loading}
           >
             <Text className="font-bold text-lg">
-              {loading ? "Signing In..." : "Sign In"}
+              {loading ? "Logging In..." : "Log In"}
             </Text>
           </TouchableOpacity>
 
