@@ -4,8 +4,8 @@ export const INITIAL_GAME_STATE = {
     missions: [
       {
         id: 1,
-        title: "Beginner Farmer",
-        description: "Complete your first harvest",
+        title: "English: Why is it important to water plants properly? \nTagalog: Bakit mahalaga ang wastong pagdidilig ng halaman?",
+        description: "",
         reward: 50,
         locked: false,
         completed: false,
@@ -55,7 +55,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 1,
       title: "Asarol",
-      description: "Basic Tool",
+      description: "Used for tilling soil",
       price: 20,
       type: "tool",
       image: require('@/assets/images/asarol1.png'),
@@ -63,7 +63,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 2,
       title: "Itak",
-      description: "Basic Tool",
+      description: " Used for cutting plants or Harvesting",
       price: 50,
       type: "tool",
       image: require('@/assets/images/itak.png'),
@@ -71,7 +71,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 3,
       title: "Regadera",
-      description: "Basic Tool",
+      description: "Used for watering plants",
       price: 20,
       type: "tool",
       image: require('@/assets/images/regadera.png'),
@@ -79,7 +79,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 4,
       title: "Sibuyas",
-      description: "Simple Crop",
+      description: "A common vegetable crop",
       price: 50,
       type: "crop",
       image: require('@/assets/images/sibuyas.png'),
@@ -87,7 +87,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 5,
       title: "Mangga",
-      description: "Basic Tool",
+      description: "Bears sweet mango fruits",
       price: 50,
       type: "tree",
       image: require('@/assets/images/mangga.png'),
@@ -95,7 +95,7 @@ export const INITIAL_GAME_STATE = {
     {
       id: 6,
       title: "Carrot",
-      description: "Simple Crop ",
+      description: "A root vegetable crop",
       price: 50,
       type: "crop",
       image: require('@/assets/images/karot.png'),
@@ -103,25 +103,25 @@ export const INITIAL_GAME_STATE = {
     {
       id: 7,
       title: "Gumamela",
-      description: "Simple Flower",
+      description: "A flowering ornamental plant",
       price: 50,
       type: "crop",
       image: require('@/assets/images/gumamela.png'),
     },
-    // {
-    //   id: 8,
-    //   title: "Lupa",
-    //   description: "Taniman ng mga Gulay at Prutas",
-    //   price: 10,
-    //   type: "tool",
-    //   image: require('@/assets/images/lupa.png'),
-    // },
-    // {
-    //   id: 10,
-    //   title: "Chemical Pesticide",
-    //   description: "Basic Tool",
-    //   price: 50,
-    //   type: "tool",
-    //   image: require('@/assets/images/chemical.png'),
-    // },
+    {
+      id: 8,
+      title: "Fertilizer",
+      description: "Improves soil nutrients for better crop growth",
+      price: 10,
+      type: "tool",
+      image: require('@/assets/images/fertilizer.png'),
+    },
+    {
+      id: 10,
+      title: "Chemical Pesticide",
+      description: "Used to protect crops from pests and insects",
+      price: 50,
+      type: "tool",
+      image: require('@/assets/images/chemical.png'),
+    },
   ];

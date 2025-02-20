@@ -69,7 +69,7 @@ export const MissionsModal = ({ visible, onClose, onMissionComplete }: MissionsM
                 }`}
               >
                 <Text className="font-bold mb-2">{mission.title}</Text>
-                <Text className="text-gray-600 mb-2">{mission.description}</Text>
+                {/* <Text className="text-gray-600 mb-2">{mission.description}</Text> */}
                 <Text className="text-green-600 font-bold mb-4 text-sm">Reward: ₱{mission.reward}.00</Text>
                 {!mission.completed && !mission.locked && (
                   <TouchableOpacity

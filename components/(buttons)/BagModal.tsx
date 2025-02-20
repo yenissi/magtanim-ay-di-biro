@@ -37,7 +37,7 @@ export const BagModal = ({
       <View className="flex-1 justify-center items-center bg-black/50">
         <View className="bg-orange-300 p-5 rounded-lg w-11/12">
           <View className="flex-row justify-between items-center mb-4">
-            <Text className="text-lg font-bold">Inventory</Text>
+            <Text className="text-lg font-bold">Bag</Text>
             <TouchableOpacity onPress={onClose}>
               <AntDesign name="close" size={24} color="black" />
             </TouchableOpacity>
