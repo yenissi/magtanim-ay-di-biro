@@ -26,6 +26,7 @@ const Signup = () => {
   const [firstNameError, setFirstNameError] = useState('');
   const [lastNameError, setLastNameError] = useState('');
   const [selectedSchool, setSelectedSchool] = useState<string | null>(null);
+  const [selectedGender, setGender] = useState<string | null>(null);
   const [gradeLevel, setGradeLevel] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [isPasswordVisible, setIsPasswordVisible] = useState<boolean>(false);
@@ -41,6 +42,10 @@ const Signup = () => {
 
   const handleSelectSchool = (school: string) => {
     setSelectedSchool(school);
+  };
+
+  const handleSelectGender = (gender: string) => {
+    setGender(gender);
   };
 
   // Email validation function
@@ -265,6 +270,21 @@ const Signup = () => {
                   onPress={() => handleSelectGrade(grade)}
                 >
                   <Text className="text-sm text-center">{grade}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {/* Gender */}
+            <Text className="text-sm mb-2">Sex:</Text>
+            <View className="flex-row gap-2">
+              {["Male", "Female"].map((gender) => (
+                <TouchableOpacity
+                  key={gender}
+                  className={`flex-1 border border-black p-2 rounded-lg ${
+                    gender === selectedGender? "bg-yellow-500" : "bg-yellow-200"
+                  }`}
+                  onPress={() => handleSelectGender(gender)}
+                >
+                  <Text className="text-sm text-center">{gender}</Text>
                 </TouchableOpacity>
               ))}
             </View>
