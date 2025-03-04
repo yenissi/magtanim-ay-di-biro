@@ -2,6 +2,8 @@ import React,{ useEffect,useState } from "react";
 import { Modal, View, Text, Pressable, ScrollView, Image } from "react-native";
 import { AntDesign } from "@expo/vector-icons";
 import { Audio } from 'expo-av';
+import * as ScreenOrientation from "expo-screen-orientation";
+
 
 interface TriviaModalProps {
   visible: boolean;
@@ -35,6 +37,7 @@ const TriviaModal = ({ visible, onClose }: TriviaModalProps ) => {
     };
   }, []);
 
+
   // Play Sound Effect
   const playSound = async () => {
     if (!buttonSound) {
@@ -47,6 +50,16 @@ const TriviaModal = ({ visible, onClose }: TriviaModalProps ) => {
       console.error("Error playing sound:", error);
     }
   };
+  useEffect(() => {
+        const lockOrientation = async () => {
+          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock. LANDSCAPE);
+        };
+        lockOrientation();
+    
+        return () => {
+          ScreenOrientation.unlockAsync();
+        };
+      }, []);
 
   return (
     <Modal visible={visible} transparent animationType="fade">

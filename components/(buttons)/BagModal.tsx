@@ -1,7 +1,13 @@
 import React from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import type { InventoryItem } from '@/types';
+
+type PlotStatus = {
+  isPlowed: boolean;
+  isWatered: boolean;
+  plant?: any;
+};
 
 interface BagModalProps {
   visible: boolean;
@@ -9,6 +15,9 @@ interface BagModalProps {
   inventory: InventoryItem[];
   onSelectItem: (item: InventoryItem | null) => void;
   selectedItem: InventoryItem | null;
+  onSellItem: (item: InventoryItem) => void;
+  onUseItem: (item: InventoryItem) => void;
+  plots: PlotStatus[][];
 }
 
 export const BagModal = ({ 
@@ -16,20 +25,137 @@ export const BagModal = ({
   onClose, 
   inventory,
   onSelectItem,
-  selectedItem 
+  selectedItem,
+  onSellItem,
+  onUseItem,
+  plots
 }: BagModalProps) => {
-  console.log('BagModal Render - Current inventory:', inventory);
   console.log('BagModal Render - Selected item:', selectedItem);
 
   const handleItemSelect = (item: InventoryItem) => {
     console.log('Item selected:', item.title);
-    if (selectedItem?.id === item.id) {
-      console.log('Unselecting item');
-      onSelectItem(null);
-    } else {
-      console.log('Selecting new item');
-      onSelectItem(item);
+    onSelectItem(selectedItem?.id === item.id ? null : item);
+  };
+
+  const handleSellItem = (item: InventoryItem) => {
+    Alert.alert(
+      "Sell Item",
+      `Are you sure you want to sell ${item.title} for ${item.sellPrice} coins?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Sell",
+          onPress: () => {
+            console.log('Selling item:', item.title);
+            onSellItem(item);
+            // Clear selection if the sold item was selected
+            if (selectedItem?.id === item.id) {
+              onSelectItem(null);
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  const handleUseItem = (item: InventoryItem) => { 
+    console.log('Using Item: ', item);
+    onSelectItem(item);
+    onClose();
+    
+    // For consumable items, ONLY check if they're valid to use, but don't consume yet
+    const nonConsumableTools = ['Asarol'];
+    if (!nonConsumableTools.includes(item.title)) {
+      // Determine what the item does first
+      if (item.title === 'Fertilizer') {
+        // If there's no currently selected plot with a plant, alert the user
+        const hasActivePlant = plots.some(row => 
+          row.some(plot => plot.plant && !plot.plant.isFertilized)
+        );
+        
+        if (!hasActivePlant) {
+          Alert.alert("No Plants Available", "You need a growing plant to apply fertilizer.");
+          return; // Don't remove the item if it can't be used
+        }
+        
+        Alert.alert(
+          "Apply Fertilizer",
+          "Select a plot with a plant to apply fertilizer.",
+          [
+            { text: "OK" }
+          ]
+        );
+      } else if (item.type === 'crop' || item.type === 'tree') {
+        // If there's no plowed and watered plot available, alert the user
+        const hasAvailablePlot = plots.some(row => 
+          row.some(plot => plot.isPlowed && plot.isWatered && !plot.plant)
+        );
+        
+        if (!hasAvailablePlot) {
+          Alert.alert("Plots Available", "You need a plowed and watered plot to plant seeds.");
+          return; // Don't remove the item if it can't be used
+        }
+        
+        Alert.alert(
+          "Plant Seeds",
+          "Select a plowed and watered plot to plant these seeds.",
+          [
+            { text: "OK" }
+          ]
+        );
+      }
+      
+      // REMOVED: Don't call onUseItem here - we only select the item, not use it
+      // onUseItem(item);
     }
+  };
+
+  const renderItemActions = (item: InventoryItem) => {
+    // Special handling for harvested crops
+    if (item.type === 'harvestedCrop') {
+      return (
+        <TouchableOpacity
+          className="rounded-lg p-2 w-full bg-blue-400"
+          onPress={() => handleSellItem(item)}
+        >
+          <Text className="text-sm font-medium text-center text-white">
+            Sell for {item.sellPrice} coins
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // For tools that should be selected rather than consumed
+    const nonConsumableTools = ['Asarol', 'Regadera', 'Itak'];
+    if (nonConsumableTools.includes(item.title)) {
+      return (
+        <TouchableOpacity
+          className={`rounded-lg p-2 w-full ${
+            selectedItem?.id === item.id ? 'bg-red-400' : 'bg-green-400'
+          }`}
+          onPress={() => handleItemSelect(item)}
+        >
+          <Text className="text-sm font-medium text-center text-white">
+            {selectedItem?.id === item.id ? 'Unselect' : 'Select'}
+          </Text>
+        </TouchableOpacity>
+      );
+    }
+
+    // For consumable items like seeds, fertilizer, etc.
+    return (
+      <TouchableOpacity
+        className="rounded-lg p-2 w-full bg-green-400"
+        onPress={() => handleUseItem(item)}
+      >
+        <Text className="text-sm font-medium text-center text-white">
+          Use
+        </Text>
+      </TouchableOpacity>
+    );
   };
 
   return (
@@ -45,7 +171,7 @@ export const BagModal = ({
 
           <ScrollView horizontal className="max-h-96">
             {inventory.length === 0 ? (
-              <Text className="text-center text-gray-600">Your bag is empty</Text>
+              <Text className="text-center text-gray-600 p-4">Your bag is empty</Text>
             ) : (
               <View className="flex-row flex-wrap gap-4">
                 {inventory.map((item, index) => (
@@ -65,20 +191,9 @@ export const BagModal = ({
                       />
                     </View>
                     <Text className="font-bold mb-1 text-center">{item.title}</Text>
-                    <Text className="text-gray-600 text-center text-sm mb-2">{item.description}</Text>
+                    <Text className="text-xs text-gray-600 mb-2 text-center">{item.type}</Text>
                     <View className="flex-row items-center gap-1">
-                      <TouchableOpacity
-                        className={`rounded-lg p-2 w-full ${
-                          selectedItem?.id === item.id 
-                            ? 'bg-red-400' 
-                            : 'bg-green-400'
-                        }`}
-                        onPress={() => handleItemSelect(item)}
-                      >
-                        <Text className="text-sm font-medium text-center text-white">
-                          {selectedItem?.id === item.id ? 'Unselect' : 'Use'}
-                        </Text>
-                      </TouchableOpacity>
+                      {renderItemActions(item)}
                     </View>
                   </View>
                 ))}

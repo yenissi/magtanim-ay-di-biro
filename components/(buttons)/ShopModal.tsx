@@ -58,6 +58,21 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
     setIsFlipped(!isFlipped);
   };
 
+  const handleBuyPress = (event: any) => {
+    event.stopPropagation();
+    onPurchase(item.id, item.price);
+  };
+
+  const handleInfoPress = (event: any) => {
+    event.stopPropagation();
+    flipCard();
+  };
+
+  const handleBackPress = (event: any) => {
+    event.stopPropagation();
+    flipCard();
+  };
+
   return (
     <View className="w-40 h-[200px]">
       <Animated.View 
@@ -81,10 +96,12 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
         )}
         <Text className="font-bold mb-2 text-[16px]">{item.title}</Text>
         <Text className="text-green-600 font-bold mb-4 text-[13px]">₱ {item.price}.00</Text>
-        <View className='flex-row items-center gap-2'>
+        <View className='flex-row items-center gap-3'>
           <TouchableOpacity 
             className="bg-green-400 rounded-lg p-2 w-20 items-center"
-            onPress={() => onPurchase(item.id, item.price)}>
+            onPress={() => {
+              onPurchase(item.id, item.price);
+            }}>
             <Text className="font-bold">Buy</Text>
           </TouchableOpacity>
           <TouchableOpacity 
@@ -104,8 +121,7 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
           },
           backAnimatedStyle
         ]}
-        className="bg-blue-200 rounded-lg p-4"
-      >
+>
         <Text className="font-bold mb-2 text-[16px]">Description</Text>
         <Text className="text-gray-600 mb-4 text-sm">{item.description}</Text>
         <TouchableOpacity 
@@ -119,22 +135,35 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
   );
 };
 
+const TABS = ['All', 'Tool', 'Crop', 'Tree'];
+
 export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: ShopModalProps) => {
+
+  const [selectedTab, setSelectedTab] = useState('All');
+
+  const filteredItems = selectedTab === 'All' 
+    ? SHOP_ITEMS 
+    : SHOP_ITEMS.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
+
   const handlePurchase = async (itemId: number, price: number) => {
     if (userMoney < price) {
       Alert.alert("Insufficient Funds", "You don't have enough money for this purchase.");
       return;
     }
-
     const db = getDatabase();
     const userRef = ref(db, `users/${uid}`);
-
     try {
       const snapshot = await get(userRef);
       if (!snapshot.exists()) return;
 
       const userData = snapshot.val();
       const inventory = userData.inventory || [];
+
+      const item = SHOP_ITEMS.find(item => item.id === itemId);
+      if (!item) {
+        console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
+        return;
+      }
 
       await update(userRef, {
         money: userData.money - price,
@@ -150,22 +179,31 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 justify-center items-center bg-black/50">
-        <View className="bg-orange-300 p-5 rounded-lg w-11/12">
-          <View className="flex-row justify-between items-center mb-4">
+          <View className="bg-orange-300 p-5 rounded-t-lg w-11/12 flex-row justify-between items-center">
             <Text className="text-lg font-bold">Shop</Text>
             <TouchableOpacity onPress={onClose}>
               <AntDesign name="close" size={24} color="black" />
             </TouchableOpacity>
           </View>
+        <View className="bg-orange-300 p-5 rounded-b-lg w-11/12 flex-row">
 
+          {/* Tabs on the Left Side */}
+          <View className="mr-2 w-1/5">
+            {TABS.map(tab => (
+              <TouchableOpacity 
+                key={tab} 
+                className={`p-3 mb-2 border border-black rounded-lg ${selectedTab === tab ? 'bg-blue-500' : 'bg-white-300'}`}
+                onPress={() => setSelectedTab(tab)}
+              >
+                <Text className="text-black font-bold text-center">{tab}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          {/* Filtered Items */}
           <ScrollView horizontal>
             <View className="flex-row gap-4">
-              {SHOP_ITEMS.map((item) => (
-                <FlipCard 
-                  key={item.id} 
-                  item={item} 
-                  onPurchase={handlePurchase}
-                />
+              {filteredItems.map((item) => (
+                <FlipCard key={item.id} item={item} onPurchase={handlePurchase} />
               ))}
             </View>
           </ScrollView>
