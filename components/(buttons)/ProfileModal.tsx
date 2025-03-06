@@ -23,7 +23,7 @@ export const ProfileModal = ({
   return (
     <Modal visible={visible} transparent animationType="fade">
       <Pressable className="flex-1 justify-center items-center bg-black/50" onPress={onClose}>
-        <View className="bg-orange-300 p-5 rounded-lg w-96 h-[240px] border border-black">
+        <View className="bg-orange-300 p-5 rounded-lg w-[auto] h-[auto] border border-black">
           <Pressable className="absolute right-3 top-3 p-2" onPress={onClose}>
             <AntDesign name="close" size={20} color="black" />
           </Pressable>
@@ -40,9 +40,9 @@ export const ProfileModal = ({
               </View>
             </View>
 
-            <View className="border-2 border-black mt-3 rounded-lg">
+            {/* <View className="border-2 border-black mt-3 rounded-lg">
               <Text className="text-2xl font-medium text-center justify-center">Level: {userData?.level || 1}</Text>
-            </View>
+            </View> */}
           </View>
           <TouchableOpacity
             className="bg-red-500 p-3 mt-4 rounded-md"

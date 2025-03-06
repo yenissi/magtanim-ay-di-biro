@@ -19,12 +19,12 @@ export const MissionsModal = ({
 }: MissionsModalProps) => {
   // Use propMissions directly instead of local state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
-  const [answers, setAnswers] = useState<string[]>([]);
+  const [answer, setAnswer] = useState<string>('');
 
-  // Reset answers when mission changes
+  // Reset answer when mission changes
   useEffect(() => {
     if (selectedMission) {
-      setAnswers(new Array(selectedMission.questions.split('\n').length).fill(''));
+      setAnswer('');
     }
   }, [selectedMission]);
 
@@ -73,50 +73,45 @@ export const MissionsModal = ({
   };
 
   const handleSubmitMission = () => {
-    if (selectedMission && answers.every(answer => answer.trim() !== '')) {
-      onMissionComplete(selectedMission.id, answers);
+    if (selectedMission && answer.trim() !== '') {
+      onMissionComplete(selectedMission.id, [answer]);
       
       setSelectedMission(null);
-      setAnswers([]);
+      setAnswer('');
     }
   };
 
   const renderMissionQuestions = () => {
     if (!selectedMission) return null;
 
-    const questionPairs = selectedMission.questions.split('\n');
+    const fullQuestion = selectedMission.questions;
+    const [englishQuestion, tagalogQuestion] = fullQuestion.split(':');
     
     return (
       <Modal visible={!!selectedMission} transparent animationType="slide">
         <View className="flex-1 justify-center items-center bg-black/50 p-4">
-          <View className="bg-white p-6 rounded-lg w-full max-w-md">
-            <Text className="text-lg font-bold mb-4">{selectedMission.title}</Text>
-            {questionPairs.map((questionPair, index) => {
-              const [englishQuestion, tagalogQuestion] = questionPair.split(': ');
-              return (
-                <View key={index} className="mb-4">
-                  <Text className="font-semibold mb-2">{englishQuestion}</Text>
-                  <Text className="text-gray-600 mb-2">{tagalogQuestion}</Text>
-                  <TextInput
-                    className="border border-gray-300 p-2 rounded-lg"
-                    placeholder="Your answer"
-                    multiline
-                    value={answers[index]}
-                    onChangeText={(text) => handleAnswerChange(index, text)}
-                  />
-                </View>
-              );
-            })}
+          <View className="bg-orange-300 p-6 rounded-lg w-full max-w-md">
+            <View className="mb-4">
+              <Text className="font-semibold mb-2">{englishQuestion}</Text>
+              <Text className="text-black-600 mb-2">{tagalogQuestion}</Text>
+              <TextInput
+                className="border border-black-300 p-2 rounded-lg h-[50px]"
+                placeholder="Sagutan kung ano ang pag kakaintindi"
+                multiline
+                value={answer}
+                onChangeText={setAnswer}
+              />
+            </View>
             <TouchableOpacity
               className={`p-3 rounded-lg ${
-                answers.every(answer => answer.trim() !== '') 
+                answer.trim() !== '' 
                   ? 'bg-green-500' 
                   : 'bg-gray-300'
               }`}
               onPress={handleSubmitMission}
-              disabled={!answers.every(answer => answer.trim() !== '')}
+              disabled={answer.trim() === ''}
             >
-              <Text className="text-white text-center font-bold">Submit Answers</Text>
+              <Text className="text-white text-center font-bold">Submit</Text>
             </TouchableOpacity>
             <TouchableOpacity
               className="mt-2 p-3 bg-red-500 rounded-lg"
@@ -133,7 +128,7 @@ export const MissionsModal = ({
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 justify-center items-center bg-black/50">
-        <View className="bg-orange-300 p-5 rounded-lg w-11/12">
+        <View className="bg-orange-300 p-5 rounded-lg w-10/12">
           <View className="flex-row justify-between items-center mb-4">
             <Text className="text-lg font-bold">Missions</Text>
             <TouchableOpacity onPress={onClose}>
@@ -141,7 +136,7 @@ export const MissionsModal = ({
             </TouchableOpacity>
           </View>
 
-          <ScrollView horizontal className="flex-row h-44">
+          <ScrollView horizontal className="flex-row ">
             {processedMissions.map((mission) => (
               <View
                 key={mission.id}
@@ -160,14 +155,19 @@ export const MissionsModal = ({
                     className="bg-yellow-400 p-2 rounded-lg items-center"
                     onPress={() => handleStartMission(mission)}
                   >
-                    <Text className="font-bold">Complete</Text>
+                    <Text className="font-bold">Uncomplete</Text>
                   </TouchableOpacity>
                 )}
                 {mission.completed && (
-                  <Text className="text-center text-green-600 font-bold">Completed!</Text>
+                  <TouchableOpacity 
+                    className="text-center text-green-600 font-bold"
+                    onPress={() => handleStartMission(mission)}
+                  > 
+                  ✅ Completed!
+                  </TouchableOpacity>
                 )}
                 {mission.locked && (
-                  <Text className="text-center text-gray-600">Locked</Text>
+                  <Text className="text-center text-gray-600"> 🔒 Locked</Text>
                 )}
               </View>
             ))}

@@ -25,7 +25,7 @@ import { Audio } from 'expo-av';
 import { Taniman } from '../../components/(buttons)/Taniman';
 import type { InventoryItem } from '@/types';
 import { savePlotsState } from '@/firebaseUtils';
-import { Decompose } from '@/components/(buttons)/Decompose';
+import { DecomposeModal } from '@/components/(buttons)/Decompose';
 import { INITIAL_GAME_STATE } from '@/config/gameConfig';
 
 // Define PlotStatus type to match what's being used in Taniman
@@ -51,8 +51,21 @@ type PlotStatus = {
   const [selectedItem, setSelectedItem] = useState<InventoryItem | null>(null);
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [rottedItems, setRottedItems] = useState<InventoryItem[]>([]);
+  const [money, setMoney] = useState(1000);
   const [plotsState, setPlotsState] = useState<any>(null);
   const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions);
+  const [rottedCrops, setRottedCrops] = useState<InventoryItem[]>([]);
+  const [composeModalVisible, setComposeModalVisible] = useState(false);
+
+
+
+  const [statistics, setStatistics] = useState({
+    plantsGrown: 0,
+    moneyEarned: 0,
+    compostCreated: 0
+  });
+
   
   // Add plots state - initialize with a 3x3 grid
   const [plots, setPlots] = useState<PlotStatus[][]>(
@@ -72,6 +85,13 @@ type PlotStatus = {
     trivia: false,
   });
 
+  const handleAddToDecompose = (item: InventoryItem) => {
+    setRottedItems(prev => [...prev, item]);
+  };
+  const handleRemoveRottedItem = (itemId: string) => {
+    setRottedItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
   useEffect(() => {
     if (!params.uid) return;
     const userRef = ref(Firebase_Database, `users/${params.uid}`);
@@ -89,29 +109,30 @@ type PlotStatus = {
   // FIX 1: Improved inventory synchronization with real-time database
   useEffect(() => {
     if (!params.uid) return;
-
+    
     const userRef = ref(Firebase_Database, `users/${params.uid}`);
     const unsubscribe = onValue(userRef, (snapshot) => {
       const userData = snapshot.val();
       if (userData) {
-        if (userData.inventory) {
-          console.log('Syncing inventory from database:', userData.inventory);
-          setInventory(userData.inventory);
-        }else{
-          setInventory([]);
-        }
-        // Update money from real-time database
-        if (userData.money !== undefined) {
-          setUserMoney(userData.money);
-        }
-        // Update plots state if exists
-        if (userData.plotsState) {
-          setPlotsState(userData.plotsState);
-          // Also update the plots state
-          setPlots(userData.plotsState);
-        }
+        // Ensure inventory is always an array
+        const fetchedInventory = Array.isArray(userData.inventory) 
+          ? userData.inventory 
+          : [];
+        
+        console.log('Syncing full user data:', {
+          inventory: fetchedInventory,
+          money: userData.money,
+          plotsState: userData.plotsState
+        });
+        
+        // Update all related states
+        setInventory(fetchedInventory);
+        setUserMoney(userData.money || 0);
+        setPlotsState(userData.plotsState || plots);
+        setPlots(userData.plotsState || plots);
       }
     });
+    
     return () => unsubscribe();
   }, [params.uid]);
 
@@ -161,11 +182,25 @@ type PlotStatus = {
     }
 
     try {
-      console.log(`Adding item to inventory:`, item);
+      console.log(`Adding item to inventory:`, {
+        item: JSON.stringify(item, null, 2),
+        currentInventoryLength: inventory?.length,
+        currentInventory: JSON.stringify(inventory, null, 2)
+      });
       
-      // Update local state first
-      const newInventory = [...inventory, item];
+      // Ensure we're working with a fresh, complete inventory
+      const currentInventory = inventory || [];
+      const newInventory = [...currentInventory, item];
+
+      console.log('New Inventory:', {
+        newInventoryLength: newInventory.length,
+        newInventory: JSON.stringify(newInventory, null, 2)
+      });
+
       setInventory(newInventory);
+
+      // Log before Firebase update
+      console.log('About to update Firebase with new inventory:', newInventory);
       
       // Then update Firebase
       const userRef = ref(Firebase_Database, `users/${params.uid}`);
@@ -173,19 +208,29 @@ type PlotStatus = {
         inventory: newInventory
       });
       
-      console.log('Item added successfully');
+      Alert.alert("Inventory Update", `Added ${item.title} to inventory`);
     } catch (error) {
       console.error('Error adding item to inventory:', error);
       Alert.alert("Error", "Failed to add item to inventory");
     }
   };
 
-  const handleUseItem = (item: InventoryItem) => { 
-    console.log('Using Item: ', item);
-    // For consumable items, remove from inventory after use
-    const nonConsumableTools = ['Asarol', 'Regadera', 'Itak'];
-    if (!nonConsumableTools.includes(item.title)) {
-      handleRemoveItem(item.id);
+
+  const handleUseItem = (usedItem: InventoryItem) => { 
+      console.log('Using Item: ', usedItem);
+    
+    // Remove the item from inventory
+    const updatedInventory = inventory.filter(item => item.id !== usedItem.id);
+    
+    // Update local state
+    setInventory(updatedInventory);
+    
+    // Update Firebase
+    if (params.uid) {
+      const userRef = ref(Firebase_Database, `users/${params.uid}`);
+      update(userRef, {
+        inventory: updatedInventory
+      });
     }
   };
 
@@ -283,6 +328,7 @@ type PlotStatus = {
     }
   };
 
+
   const handleUpdateMoney = async (amount: number) => {
     if (!params.uid) return;
     try {
@@ -319,7 +365,7 @@ type PlotStatus = {
       handleUpdateMoney(completedMission.reward);
     }
   };
-  
+
   const handleUpdateStatistics = async (stats: { plantsGrown?: number, moneyEarned?: number }) => {
     if (!params.uid) return;
     
@@ -338,6 +384,12 @@ type PlotStatus = {
     } catch (error) {
       console.error('Error updating statistics:', error);
     }
+  };
+
+  const onUseItem = (usedItem: InventoryItem) => {
+    setInventory(currentInventory => 
+      currentInventory.filter(item => item.id !== usedItem.id)
+    );
   };
 
   if (loading) {
@@ -457,9 +509,14 @@ type PlotStatus = {
           onPurchase={() => {/* Refresh game data handled by useGameData */}}
         />
 
-        <Decompose
+        <DecomposeModal
           visible={decomposeVisible}
           onClose={() => setDecomposeVisible(false)}
+          rottedItems={rottedItems}
+          onRemoveItem={handleRemoveRottedItem}
+          onUpdateMoney={handleUpdateMoney}
+          onAddToInventory={handleAddToInventory}
+          // onUpdateStatistics={handleUpdateStatistics}
         />
 
         <BagModal
@@ -469,9 +526,9 @@ type PlotStatus = {
           onSelectItem={setSelectedItem}
           selectedItem={selectedItem}
           onSellItem={handleSellItem}
-          onUseItem={handleUseItem}
+          onUseItem={onUseItem}
           plots={plots || []}
-          // onRemoveItem={handleRemoveItem}
+          onRemoveItem={handleRemoveItem}
         />
 
         <MissionsModal
@@ -505,6 +562,7 @@ type PlotStatus = {
           initialPlotsState={plotsState}
           onSavePlotsState={handleSavePlotsState}
           onUseItem={handleUseItem}
+          onAddToDecompose={handleAddToDecompose}
         />
       </View>
     </ImageBackground>

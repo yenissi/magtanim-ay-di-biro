@@ -199,6 +199,7 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
               </TouchableOpacity>
             ))}
           </View>
+          
           {/* Filtered Items */}
           <ScrollView horizontal>
             <View className="flex-row gap-4">

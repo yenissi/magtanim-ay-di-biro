@@ -17,6 +17,7 @@ interface BagModalProps {
   selectedItem: InventoryItem | null;
   onSellItem: (item: InventoryItem) => void;
   onUseItem: (item: InventoryItem) => void;
+  onRemoveItem: (itemId: string) => void; 
   plots: PlotStatus[][];
 }
 
@@ -28,13 +29,19 @@ export const BagModal = ({
   selectedItem,
   onSellItem,
   onUseItem,
+  onRemoveItem,
   plots
 }: BagModalProps) => {
+  console.log('BagModal - Current Inventory:', inventory);
   console.log('BagModal Render - Selected item:', selectedItem);
 
-  const handleItemSelect = (item: InventoryItem) => {
-    console.log('Item selected:', item.title);
-    onSelectItem(selectedItem?.id === item.id ? null : item);
+  // const handleItemSelect = (item: InventoryItem) => {
+  //   console.log('Item selected:', item.title);
+  //   onSelectItem(selectedItem?.id === item.id ? null : item);
+  // };
+
+  const handleItemUse = (item: InventoryItem) => {
+    onUseItem(item); // Remove item from inventory
   };
 
   const handleSellItem = (item: InventoryItem) => {
@@ -63,11 +70,18 @@ export const BagModal = ({
 
   const handleUseItem = (item: InventoryItem) => { 
     console.log('Using Item: ', item);
+
+    if (item.title === 'Itak') {
+      onSelectItem(item);
+      onClose();
+      return;
+    }
+
     onSelectItem(item);
     onClose();
     
     // For consumable items, ONLY check if they're valid to use, but don't consume yet
-    const nonConsumableTools = ['Asarol'];
+    const nonConsumableTools = [''];
     if (!nonConsumableTools.includes(item.title)) {
       // Determine what the item does first
       if (item.title === 'Fertilizer') {
@@ -77,7 +91,6 @@ export const BagModal = ({
         );
         
         if (!hasActivePlant) {
-          Alert.alert("No Plants Available", "You need a growing plant to apply fertilizer.");
           return; // Don't remove the item if it can't be used
         }
         
@@ -95,7 +108,7 @@ export const BagModal = ({
         );
         
         if (!hasAvailablePlot) {
-          Alert.alert("Plots Available", "You need a plowed and watered plot to plant seeds.");
+          // Alert.alert("Plots Available", "You need a plowed and watered plot to plant seeds.");
           return; // Don't remove the item if it can't be used
         }
         
@@ -128,22 +141,6 @@ export const BagModal = ({
       );
     }
 
-    // For tools that should be selected rather than consumed
-    const nonConsumableTools = ['Asarol', 'Regadera', 'Itak'];
-    if (nonConsumableTools.includes(item.title)) {
-      return (
-        <TouchableOpacity
-          className={`rounded-lg p-2 w-full ${
-            selectedItem?.id === item.id ? 'bg-red-400' : 'bg-green-400'
-          }`}
-          onPress={() => handleItemSelect(item)}
-        >
-          <Text className="text-sm font-medium text-center text-white">
-            {selectedItem?.id === item.id ? 'Unselect' : 'Select'}
-          </Text>
-        </TouchableOpacity>
-      );
-    }
 
     // For consumable items like seeds, fertilizer, etc.
     return (

@@ -12,8 +12,7 @@ type PlantData = {
   cropType: string;
   image: number;
   hasInfestation: boolean;
-  infestationTimer?: NodeJS.Timeout;
-  decayTimer?: NodeJS.Timeout;
+  isRotted?: boolean;
   isFertilized: boolean;
 };
 
@@ -23,24 +22,39 @@ type PlotStatus = {
   plant?: PlantData;
 };
 
+// Key-value pair to store plot identifiers and their timer IDs
+type TimerMap = {
+  [plotId: string]: NodeJS.Timeout;
+};
+
 const GROWTH_TIMES = {
   Sibuyas: 100000,
   Mangga: 200000,
   Carrot: 100000,
-  Gumamela: 200000
+  Gumamela: 200000,
+  Santan: 200000,
+  Kamatis: 100000,
+  Orchids: 200000,
+  Saging: 100000,
+  Papaya: 100000,
 } as const;
 
 const HARVEST_VALUES = {
-  Sibuyas: 55,
-  Mangga: 60,
-  Carrot: 55,
-  Gumamela: 80
+  Sibuyas: { normal: 50, rotted: 40 },
+  Mangga: { normal: 150, rotted: 25 },
+  Carrot: { normal: 100, rotted: 20 },
+  Gumamela: { normal: 250, rotted: 30 },
+  Santan: { normal: 150, rotted: 40 },
+  Kamatis: { normal: 100, rotted: 30 },
+  Orchids: { normal: 150, rotted: 40 },
+  Saging: { normal: 100, rotted: 35 },
+  Papaya: { normal: 100, rotted: 25 },
 } as const;
 
-const INFESTATION_CHANCE = 0.9; // 90% chance of infestation
-const INFESTATION_CHECK_INTERVAL = 5000; // Check every 5 seconds
-const DECAY_TIME = 20000; // 20 seconds to treat infestation before decay
-const FERTILIZER_GROWTH_MULTIPLIER = 0.5; // Reduces growth time by 50%
+const INFESTATION_CHANCE = 1; // 100% chance of infestation
+const INFESTATION_CHECK_INTERVAL = 10000; // Check every 10 seconds
+const DECAY_TIME = 30000; // 30 seconds to treat infestation before decay
+const FERTILIZER_GROWTH_MULTIPLIER = 0.9; // Reduces growth time by 10%
 
 interface TanimanProps {
   inventory: InventoryItem[];
@@ -52,6 +66,7 @@ interface TanimanProps {
   initialPlotsState?: PlotStatus[][];
   onSavePlotsState: (plotsData: PlotStatus[][]) => void;
   onUseItem: (item: InventoryItem) => void; 
+  onAddToDecompose: (item: InventoryItem) => void;
 }
 
 export const Taniman: React.FC<TanimanProps> = ({ 
@@ -63,12 +78,17 @@ export const Taniman: React.FC<TanimanProps> = ({
   onAddToInventory,
   initialPlotsState,
   onSavePlotsState,
-  onUseItem
+  onUseItem,
+  onAddToDecompose
 }) => {
   const GRID_SIZE = 3;
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [refresh, setRefresh] = useState(false);
-  const timeoutRef = useRef<NodeJS.Timeout>();
+  const soundTimeoutRef = useRef<NodeJS.Timeout>();
+  
+  // Use refs to store timers outside of state
+  const infestationTimersRef = useRef<TimerMap>({});
+  const decayTimersRef = useRef<TimerMap>({});
 
   const triggerRefresh = () => setRefresh(prev => !prev);
 
@@ -82,6 +102,35 @@ export const Taniman: React.FC<TanimanProps> = ({
     )
   );
 
+  // Add this new function to handle plant decay directly
+  const handlePlantDecay = (row: number, col: number) => {
+    setPlots(current => {
+      const plot = current[row][col];
+      if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) {
+        return current; // No change needed
+      }
+      
+      console.log(`Manual decay triggered for infested plant at [${row},${col}]`);
+      const newPlots = [...current];
+      newPlots[row] = [...newPlots[row]];
+      newPlots[row][col] = {
+        ...newPlots[row][col],
+        plant: {
+          ...newPlots[row][col].plant!,
+          isRotted: true,
+          hasInfestation: false
+        }
+      };
+      
+      // Alert the user
+      Alert.alert(
+        "Plant Rotted!", 
+        `Your ${plot.plant.cropType} has rotted due to untreated infestation. Harvest value will be reduced.`
+      );
+      
+      return newPlots;
+    });
+  };
 
   // Save plots state whenever it changes
   useEffect(() => {
@@ -89,28 +138,113 @@ export const Taniman: React.FC<TanimanProps> = ({
     console.log('Updated plots state:', JSON.stringify(plots, null, 2));
   }, [plots]);
 
-  // Cleanup function
+  const [timers, setTimers] = useState<{
+    growth: { [plotId: string]: number };
+    decay: { [plotId: string]: number };
+  }>({
+    growth: {},
+    decay: {},
+  });
+
+  const formatTime = (seconds: number) => {
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
+  };
+
+  // Timer update effect
   useEffect(() => {
-    return () => {
-      if (sound) {
-        sound.unloadAsync();
-      }
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-      // Clean up all infestation and decay timers
-      plots.forEach(row => {
-        row.forEach(plot => {
-          if (plot.plant?.infestationTimer) {
-            clearInterval(plot.plant.infestationTimer);
-          }
-          if (plot.plant?.decayTimer) {
-            clearTimeout(plot.plant.decayTimer);
+    const interval = setInterval(() => {
+      const now = new Date().getTime();
+      const newTimers = { growth: {}, decay: {} };
+
+      plots.forEach((row, rowIndex) => {
+        row.forEach((plot, colIndex) => {
+          const plotId = `${rowIndex}-${colIndex}`;
+          if (plot.plant) {
+            // Growth timer
+            if (plot.plant.stage < 3) {
+              const timeRemaining = Math.max(0, plot.plant.readyAt.getTime() - now);
+              newTimers.growth[plotId] = timeRemaining;
+            }
+
+            // Decay timer (if infested)
+            if (plot.plant.hasInfestation && !plot.plant.isRotted) {
+              const infestationStartTime = plot.plant.readyAt.getTime(); // Assuming infestation starts when plant reaches stage 3
+              const decayTimeRemaining = Math.max(0, infestationStartTime + DECAY_TIME - now);
+              newTimers.decay[plotId] = decayTimeRemaining;
+
+              // Check if decay timer has reached zero - apply rot immediately
+              if (decayTimeRemaining === 0 && plot.plant.hasInfestation) {
+                handlePlantDecay(rowIndex, colIndex);
+              }
+            }
           }
         });
       });
+
+      setTimers(newTimers);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [plots]);
+
+  // Setup infestation timers for existing plants when component mounts
+  useEffect(() => {
+    // First, clear any existing timers
+    clearAllTimers();
+    
+    // Then set up new timers for all existing plants
+    plots.forEach((row, rowIndex) => {
+      row.forEach((plot, colIndex) => {
+        if (plot.plant && plot.plant.stage === 3 && !plot.plant.isRotted) {
+          const plotId = `${rowIndex}-${colIndex}`;
+          startInfestationCheck(rowIndex, colIndex);
+        }
+      });
+    });
+    
+    // Cleanup function
+    return () => {
+      clearAllTimers();
+      if (sound) {
+        sound.unloadAsync();
+      }
+      if (soundTimeoutRef.current) {
+        clearTimeout(soundTimeoutRef.current);
+      }
     };
-  }, [sound, plots]);
+  }, []);
+
+  const clearAllTimers = () => {
+    // Clear all infestation timers
+    Object.values(infestationTimersRef.current).forEach(timer => {
+      clearInterval(timer);
+    });
+    infestationTimersRef.current = {};
+    
+    // Clear all decay timers
+    Object.values(decayTimersRef.current).forEach(timer => {
+      clearTimeout(timer);
+    });
+    decayTimersRef.current = {};
+  };
+
+  const clearPlotTimers = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    
+    // Clear infestation timer if exists
+    if (infestationTimersRef.current[plotId]) {
+      clearInterval(infestationTimersRef.current[plotId]);
+      delete infestationTimersRef.current[plotId];
+    }
+    
+    // Clear decay timer if exists
+    if (decayTimersRef.current[plotId]) {
+      clearTimeout(decayTimersRef.current[plotId]);
+      delete decayTimersRef.current[plotId];
+    }
+  };
 
   const playTimedSound = async (soundFile: number) => {
     try {
@@ -141,7 +275,7 @@ export const Taniman: React.FC<TanimanProps> = ({
       await newSound.playAsync();
     
       // Set up cleanup timeout
-      timeoutRef.current = setTimeout(async () => {
+      soundTimeoutRef.current = setTimeout(async () => {
         if (newSound) {
           try {
             const currentStatus = await newSound.getStatusAsync();
@@ -159,76 +293,141 @@ export const Taniman: React.FC<TanimanProps> = ({
       console.error('Failed to play sound:', error);
     }
   };
-// Start infestation check for a plant
-const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
-  // Growth check interval to monitor when plant reaches stage 2
-  const growthCheckInterval = setInterval(() => {
-    setPlots(current => {
-      // Deep clone the current state to ensure proper updates
-      const newPlots = JSON.parse(JSON.stringify(current));
-      // Check if plant has reached stage 2 and is not already infested
-      if (newPlots[row][col].plant?.stage === 2 && 
-          newPlots[row][col].plant?.hasInfestation === false) {
-        console.log('Plant reached maturity - triggering infestation');
-        // Clear the growth check interval
-        clearInterval(growthCheckInterval);
-        // Set infestation to true
-        if (newPlots[row][col].plant) {
-          // Clear any existing decay timer
-          if (newPlots[row][col].plant.decayTimer) {
-            clearTimeout(newPlots[row][col].plant.decayTimer);
-          }
-          // Apply infestation based on probability
-          if (Math.random() <= INFESTATION_CHANCE) {
-            newPlots[row][col].plant.hasInfestation = true;
-            // Start decay timer
-            const decayTimer = setTimeout(() => {
-              console.log('Decay timer triggered - destroying plant');
-              setPlots(decayState => {
-                const decayPlots = JSON.parse(JSON.stringify(decayState));
-                decayPlots[row][col] = {
-                  isPlowed: false,
-                  isWatered: false,
-                  plant: undefined
-                };
-                return decayPlots;
-              });
-              Alert.alert('Crop Lost!', 'Your crop has rotted due to untreated infestation.');
-            }, DECAY_TIME);
-            newPlots[row][col].plant.decayTimer = decayTimer;
-            // Show infestation alert
-            Alert.alert(
-              'Insect Infestation!',
-              'Your crops are being attacked by insects! Use pesticide quickly!'
-            );
-          }
+
+  const startInfestationCheck = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    
+    // Clear any existing timer first
+    if (infestationTimersRef.current[plotId]) {
+      clearInterval(infestationTimersRef.current[plotId]);
+    }
+    
+    // Create new infestation check timer
+    const timer = setInterval(() => {
+      setPlots(current => {
+        const plot = current[row][col];
+        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted) {
+          return current; // No change needed
         }
+        
+        // Apply infestation with 100% chance
+        if (Math.random() < INFESTATION_CHANCE) {
+          console.log(`Infestation triggered for plant at [${row},${col}]`);
+          
+          const newPlots = [...current];
+          newPlots[row] = [...newPlots[row]];
+          newPlots[row][col] = {
+            ...newPlots[row][col],
+            plant: {
+              ...newPlots[row][col].plant!,
+              hasInfestation: true
+            }
+          };
+          
+          // Start the decay timer
+          startDecayTimer(row, col);
+          
+          return newPlots;
+        }
+        
+        return current; // No changes
+      });
+    }, INFESTATION_CHECK_INTERVAL);
+    
+    // Store the timer ID
+    infestationTimersRef.current[plotId] = timer;
+    
+    console.log(`Started infestation check for plant at [${row},${col}]`);
+    return timer;
+  };
+
+  const startDecayTimer = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    // Clear any existing decay timer first
+    if (decayTimersRef.current[plotId]) {
+      clearTimeout(decayTimersRef.current[plotId]);
+    }
+    const timer = setTimeout(() => {
+      setPlots(current => {
+        const plot = current[row][col];
+        if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) {
+          return current; // No change needed
+        }
+        console.log(`Decay timer triggered for infested plant at [${row},${col}]`);
+        const newPlots = [...current];
+        newPlots[row] = [...newPlots[row]];
+        newPlots[row][col] = {
+          ...newPlots[row][col],
+          plant: {
+            ...newPlots[row][col].plant!,
+            isRotted: true,
+            hasInfestation: false
+          }
+        };
+        
+        // Alert the user
+        Alert.alert(
+          "Plant Rotted!", 
+          `Your ${plot.plant.cropType} has rotted due to untreated infestation. Harvest value will be reduced.`
+        );
         return newPlots;
-      }
-      // If no changes, return original state
-      return current;
-    });
-  }, 1000);
-  
-  return growthCheckInterval as unknown as NodeJS.Timeout;
-};
+      });
+    }, DECAY_TIME);
+    decayTimersRef.current[plotId] = timer;
+    console.log(`Started decay timer for infested plant at [${row},${col}]`);
+    return timer;
+  };
+
+  const InfestationDebugOverlay = ({ plots }: { plots: PlotStatus[][] }) => {
+    return (
+      <View style={{
+        position: 'absolute', 
+        top: 10, 
+        left: 10, 
+        backgroundColor: 'rgba(0,0,0)', 
+        padding: 10
+      }}>
+        {plots.map((row, rowIndex) => (
+          row.map((plot, colIndex) => (
+            plot.plant && (
+              <Text key={`${rowIndex}-${colIndex}`} style={{color: 'white'}}>
+                Plot [{rowIndex},{colIndex}]: 
+                Stage {plot.plant.stage}, 
+                Infested: {plot.plant.hasInfestation ? '🐛 YES' : '✅ NO'},
+                Rotted: {plot.plant.isRotted ? '💀 YES' : '✅ NO'}
+              </Text>
+            )
+          ))
+        ))}
+      </View>
+    );
+  };
 
   // Growth timer for plants
   useEffect(() => {
     const growthTimer = setInterval(() => {
       setPlots(currentPlots => {
         let updated = false;
-        const newPlots = currentPlots.map(row =>
-          row.map(plot => {
+        const newPlots = currentPlots.map((row, rowIndex) =>
+          row.map((plot, colIndex) => {
             if (plot.plant) {
               const now = new Date();
               if (now >= plot.plant.readyAt && plot.plant.stage < 3) {
+                // Plant has advanced to next stage
                 updated = true;
+                
+                // Check if plant has just reached stage 3 (fully grown)
+                const newStage = plot.plant.stage + 1;
+                if (newStage === 3) {
+                  // Start infestation checks now that the plant is mature
+                  startInfestationCheck(rowIndex, colIndex);
+                }
+                
                 return {
                   ...plot,
                   plant: {
                     ...plot.plant,
-                    stage: plot.plant.stage + 1
+                    stage: newStage
                   }
                 };
               }
@@ -246,7 +445,9 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
   const handleHarvest = (row: number, col: number, plot: PlotStatus) => {
     if (plot.plant?.stage === 3) {
       const cropType = plot.plant.cropType as keyof typeof HARVEST_VALUES;
-      let harvestValue = HARVEST_VALUES[cropType];
+      let harvestValue = plot.plant.isRotted 
+        ? HARVEST_VALUES[cropType].rotted 
+        : HARVEST_VALUES[cropType].normal;
       
       // Double harvest value if fertilized
       if (plot.plant.isFertilized) {
@@ -256,16 +457,32 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
       // Create a harvested crop item to add to inventory
       const harvestedCrop: InventoryItem = {
         id: `${cropType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: `Harvested ${cropType}`,
+        title: `${plot.plant.isRotted ? 'Rotted ' : ''}Harvested ${cropType}`,
         type: 'harvestedCrop',
-        description: `A freshly harvested ${cropType} ready to be sold.`,
+        description: plot.plant.isRotted 
+          ? `A rotted ${cropType} with reduced value.` 
+          : `A freshly harvested ${cropType} ready to be sold.`,
         price: 0,
         sellPrice: harvestValue,
-        image: plot.plant.image // Use the same image as the mature plant
+        image: plot.plant.image
       };
       
-      // Add harvested crop to inventory
-      onAddToInventory(harvestedCrop);
+      // CHANGED: Route the harvested crop based on whether it's rotted or not
+      if (plot.plant.isRotted) {
+        // Send rotted crops to the DecomposeModal instead of regular inventory
+        onAddToDecompose(harvestedCrop);
+        Alert.alert(
+          'Harvest Complete!',
+          `Rotted ${cropType} has been sent to compost.`
+        );
+      } else {
+        // Add normal crops to inventory
+        onAddToInventory(harvestedCrop);
+        Alert.alert(
+          'Harvest Complete!',
+          `${cropType} has been harvested and added to your bag.`
+        );
+      }
       
       // Update statistics
       onUpdateStatistics({ 
@@ -273,20 +490,18 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
       });
       
       Alert.alert(
-        'Harvest Success!',
-        `${cropType} has been harvested and added to your bag.`
+        'Harvest Complete!',
+        plot.plant.isRotted 
+          ? `${cropType} was rotted but still harvested with reduced value.`
+          : `${cropType} has been harvested and added to your bag.`
       );
   
       // Clear all timers for the plot
-      if (plot.plant.infestationTimer) {
-        clearInterval(plot.plant.infestationTimer);
-      }
-      if (plot.plant.decayTimer) {
-        clearTimeout(plot.plant.decayTimer);
-      }
+      clearPlotTimers(row, col);
   
       setPlots(current => {
         const newPlots = [...current];
+        newPlots[row] = [...newPlots[row]];
         newPlots[row][col] = {
           isPlowed: false,
           isWatered: false,
@@ -311,6 +526,7 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
         if (!plot.isPlowed) {
           setPlots(current => {
             const newPlots = [...current];
+            newPlots[row] = [...newPlots[row]];
             newPlots[row][col] = {
               ...plot,
               isPlowed: true
@@ -318,6 +534,7 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
             return newPlots;
           });
           playTimedSound(require('@/assets/sound/plow.mp3'));
+          onUseItem(selectedItem);
         } else {
           Alert.alert("Already Plowed", "This plot has already been plowed.");
         }
@@ -327,6 +544,7 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
         if (plot.isPlowed && !plot.isWatered) {
           setPlots(current => {
             const newPlots = [...current];
+            newPlots[row] = [...newPlots[row]];
             newPlots[row][col] = {
               ...plot,
               isWatered: true
@@ -334,6 +552,8 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
             return newPlots;
           });
           playTimedSound(require('@/assets/sound/water.mp3'));
+          onUseItem(selectedItem);
+
         } else if (!plot.isPlowed) {
           Alert.alert("Not Plowed", "You need to plow this plot first.");
         } else if (plot.isWatered) {
@@ -351,40 +571,49 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
         }
         break;
   
-      case 'Pesticide':
-        if (plot.plant?.hasInfestation) {
-          // Clear decay timer
-          if (plot.plant.decayTimer) {
-            clearTimeout(plot.plant.decayTimer);
-          }
-          
-          setPlots(current => {
-            const newPlots = [...current];
-            if (newPlots[row][col].plant) {
-              newPlots[row][col].plant = {
-                ...newPlots[row][col].plant!,
-                hasInfestation: false
+        case "Chemical Pesticide":
+          if (plot.plant?.hasInfestation) {
+            // Clear decay timer
+            clearPlotTimers(row, col);
+
+            setPlots((current) => {
+              const newPlots = [...current];
+              newPlots[row] = [...newPlots[row]];
+              newPlots[row][col] = {
+                ...newPlots[row][col],
+                plant: {
+                  ...newPlots[row][col].plant!,
+                  hasInfestation: false,
+                },
               };
-            }
-            return newPlots;
-          });
-          
-          Alert.alert('Success!', 'The infestation has been treated.');
-          playTimedSound(require('@/assets/sound/spray.mp3'));
-          
-          // Use up the pesticide item
-          onUseItem(selectedItem);
-        } else if (plot.plant) {
-          Alert.alert("No Infestation", "This plant doesn't have an infestation.");
-        } else {
-          Alert.alert("No Plant", "There is no plant in this plot.");
-        }
-        break;
+    
+              // Restart infestation check
+              // startInfestationCheck(row, col);
+              return newPlots;
+            });
+
+            // After state update, restart infestation check
+            setTimeout(() => {
+              startInfestationCheck(row, col);
+            }, 100);
+    
+            Alert.alert("Success!", "The infestation has been treated.");
+            playTimedSound(require("@/assets/sound/spray.mp3"));
+            // Use up the pesticide item
+            onUseItem(selectedItem);
+          } else if (plot.plant) {
+            Alert.alert("No Infestation", "This plant doesn't have an infestation.");
+          } else {
+            Alert.alert("No Plant", "There is no plant in this plot.");
+          }
+          break;
   
-      case 'Fertilizer':
+      case 'Synthetic Fertilizer':
+      case 'Organic Fertilizer':
         if (plot.plant && !plot.plant.isFertilized) {
           setPlots(current => {
             const newPlots = [...current];
+            newPlots[row] = [...newPlots[row]];
             if (newPlots[row][col].plant) {
               const currentTime = new Date();
               const remainingTime = plot.plant.readyAt.getTime() - currentTime.getTime();
@@ -392,10 +621,13 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
                 currentTime.getTime() + (remainingTime * FERTILIZER_GROWTH_MULTIPLIER)
               );
               
-              newPlots[row][col].plant = {
-                ...newPlots[row][col].plant!,
-                isFertilized: true,
-                readyAt: newReadyAt
+              newPlots[row][col] = {
+                ...newPlots[row][col],
+                plant: {
+                  ...newPlots[row][col].plant!,
+                  isFertilized: true,
+                  readyAt: newReadyAt
+                }
               };
             }
             return newPlots;
@@ -446,16 +678,18 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
       
           setPlots(current => {
             const newPlots = [...current];
+            newPlots[row] = [...newPlots[row]];
             newPlots[row][col] = {
               ...plot,
               plant: newPlant
             };
             
-            // Start infestation check for the new plant
-            newPlots[row][col].plant!.infestationTimer = startInfestationCheck(row, col, newPlant);
-            
             return newPlots;
           });
+          
+          // Note: We don't start infestation check until the plant reaches stage 3
+          // This is handled in the growth timer effect
+          
           playTimedSound(require('@/assets/sound/plant.mp3'));
           
           // Only remove seed from inventory AFTER successful planting
@@ -466,134 +700,136 @@ const startInfestationCheck = (row: number, col: number, plant: PlantData) => {
   };
 
   const getPlantImage = (plant: PlantData) => {
-    console.log(`Plant infestation status: ${plant.hasInfestation}`);
-    if (plant.hasInfestation == true) {
-      return require('@/assets/images/infested.png'); 
-      console.log(`🐛 Infestation detected! Showing pest image.`);
+    if (plant.isRotted) {
+      return require('@/assets/images/rotten.png');
     }
+    
+    if (plant.hasInfestation) {
+      return require('@/assets/images/infe.png');
+    }
+    
     switch (plant.stage) {
       case 0:
-      return require('@/assets/images/seeds.png');
-    case 1:
-      return require('@/assets/images/sprout.png');
-    case 2:
-    case 3:
-      return plant.image;
-    default: 
-      return plant.image;
-  }
+        return require('@/assets/images/seeds.png');
+      case 1:
+        return require('@/assets/images/sprout.png');
+      case 2:
+      case 3:
+        return plant.image;
+      default: 
+        return plant.image;
+    }
   };
 
   const testInfestation = (row: number, col: number) => {
+
     setPlots(current => {
-      // Skip if no plant or plant is not mature
-      if (!current[row][col].plant || current[row][col].plant.stage !== 2) {
-        Alert.alert('Test Failed', 'Plant must be at stage 2 to test infestation');
-        return current;
-      }
-  
-      // Create a deep copy to ensure state update
-      const newPlots = JSON.parse(JSON.stringify(current));
-      
-      // Set infestation flag
-      newPlots[row][col].plant.hasInfestation = true;
-      
-      console.log('TEST: Setting infestation to true for plant at:', row, col);
-      console.log('Plant infestation state:', newPlots[row][col].plant.hasInfestation);
-      
-      // Start decay timer
-      const decayTimer = setTimeout(() => {
-        setPlots(decayState => {
-          const decayPlots = [...decayState];
-          decayPlots[row][col] = {
-            isPlowed: false,
-            isWatered: false,
-            plant: undefined
-          };
-          return decayPlots;
+      const newPlots = [...current];
+      newPlots[row] = [...newPlots[row]];
+
+      if (newPlots[row][col].plant) {
+        newPlots[row][col] = {
+          ...newPlots[row][col],
+          plant: {
+            ...newPlots[row][col].plant!,
+            hasInfestation: true
+          }
+        };
+        // Start decay timer
+        startDecayTimer(row, col);
+        console.log('🐛 FORCED Infestation:', {
+          row, 
+          col, 
+          infestationStatus: newPlots[row][col].plant.hasInfestation
         });
-        Alert.alert('Crop Lost!', 'Your crop has rotted due to untreated infestation.');
-      }, DECAY_TIME);
-      
-      // Store the decay timer
-      newPlots[row][col].plant.decayTimer = decayTimer;
-      
-      Alert.alert('Test Infestation', 'Infestation has been manually added to this plant');
-      
+        Alert.alert('Infestation Forced', 'Infestation manually set to true');
+      }
       return newPlots;
     });
-    triggerRefresh();
   };
 
   return (
-    <View className="absolute bottom-32 left-8">
+    <View className="absolute bottom-[100px] left-[300px]">
       <View className="flex-row gap-2">
         {plots.map((row, rowIndex) => (
           <View key={rowIndex} className="flex-col gap-2">
             {row.map((plot, colIndex) => (
-              // Modify the TouchableOpacity part of your render method to ensure the pest icon is shown
-            <TouchableOpacity
-              key={colIndex}
-              onPress={() => handlePlotPress(rowIndex, colIndex)}
-              className={`w-16 h-16 rounded-lg overflow-hidden border-4 ${
-                plot.isPlowed 
-                  ? 'border-amber-800 bg-amber-700' 
-                  : 'border-green-800 bg-green-700'
-              } ${
-                plot.isWatered 
-                  ? 'opacity-90 shadow-lg shadow-blue-500' 
-                  : 'opacity-100'
-              }`}
-              style={{
-                shadowColor: plot.isWatered ? '#3b82f6' : 'transparent',
-                shadowOffset: { width: 0, height: 0 },
-                shadowOpacity: plot.isWatered ? 0.5 : 0,
-                shadowRadius: 5,
-                elevation: plot.isWatered ? 5 : 0,
-              }}
-            >
-              {plot.plant && (
-                <View className="w-full h-full items-center justify-center">
-                  <Image
-                    source={getPlantImage(plot.plant)}
-                    className="w-12 h-12"
-                    resizeMode="contain"
-                  />
-                  <TouchableOpacity 
-                    onPress={() => testInfestation(0, 0)} 
-                    className="absolute top-0 left-0 bg-red-500 p-2 rounded-lg">
-                    <Text className="text-white">Test Infestation</Text>
-                  </TouchableOpacity>
-                  {plot.plant.stage === 3 && (
-                    <View className="absolute top-0 right-0 bg-yellow-400 rounded-bl-lg p-1">
-                      <Text className="text-xs">✓</Text>
+              <TouchableOpacity
+                key={colIndex}
+                onPress={() => handlePlotPress(rowIndex, colIndex)}
+                className={`w-16 h-16 rounded-lg overflow-hidden border-4 ${
+                  plot.isPlowed 
+                    ? 'border-amber-800 bg-amber-700' 
+                    : 'border-green-800 bg-green-700'
+                } ${
+                  plot.isWatered 
+                    ? 'opacity-90 shadow-lg shadow-blue-500' 
+                    : 'opacity-100'
+                }`}
+              >
+                {plot.plant && (
+                  <View className="w-full h-full items-center justify-center">
+                    <Image
+                      source={getPlantImage(plot.plant)}
+                      className="w-12 h-12"
+                      resizeMode="contain"
+                    />
+                    {plot.plant.stage === 3 && (
+                      <View className="absolute top-0 right-0 bg-yellow-400 rounded-bl-lg p-1">
+                        <Text className="text-xs">✓</Text>
+                      </View>
+                    )}
+                    {plot.plant.hasInfestation && !plot.plant.isRotted && (
+                      <View className="absolute bottom-0 left-0 bg-red-500 rounded-br-lg p-1">
+                        <Text className="text-xs font-bold">🐛</Text>
+                      </View>
+                    )}
+                    {plot.plant.isRotted && (
+                      <View className="absolute bottom-0 left-0 bg-brown-500 rounded-br-lg p-1">
+                        <Text className="text-xs font-bold">💀</Text>
+                      </View>
+                    )}
+                    {plot.plant.isFertilized && (
+                      <View className="absolute bottom-0 right-0 bg-green-500 rounded-tl-lg p-1">
+                        <Text className="text-xs">⚡</Text>
+                      </View>
+                    )}
+                    {/* Display Timers */}
+                    <View className="absolute bottom-0 left-0 right-0 bg-black/50 p-1">
+                      {plot.plant.stage < 3 && (
+                        <Text className="text-white text-[5px] text-center">
+                          Grow: {formatTime(timers.growth[`${rowIndex}-${colIndex}`] / 1000)}
+                        </Text>
+                      )}
+                      {plot.plant.hasInfestation && !plot.plant.isRotted && (
+                        <Text className="text-white text-[5px] text-center">
+                          Decay: {formatTime(timers.decay[`${rowIndex}-${colIndex}`] / 1000)}
+                        </Text>
+                      )}
                     </View>
-                  )}
-                  {/* Debug indicator - always visible */}
-                  {/* <View className="absolute bottom-0 left-0 bg-purple-500 rounded-tr-lg p-1">
-                    <Text className="text-xs">{plot.plant.hasInfestation ? 'T' : 'F'}</Text>
-                  </View> */}
-                  {/* Make pest indicator more prominent */}
-                  {plot.plant.hasInfestation === true && (
-                    <View className="absolute top-0 left-0 bg-red-500 rounded-br-lg p-1">
-                      <Text className="text-xs font-bold">🐛</Text>
-                    </View>
-                  )}
-                  {plot.plant.isFertilized && (
-                    <View className="absolute bottom-0 right-0 bg-green-500 rounded-tl-lg p-1">
-                      <Text className="text-xs">⚡</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-            </TouchableOpacity>
+                  </View>
+                )}
+              </TouchableOpacity>
             ))}
           </View>
         ))}
       </View>
 
+      {/* Debug Button - Uncomment to test infestation */}
+      {/* <TouchableOpacity 
+        onPress={() => testInfestation(0, 0)} 
+        className="bg-red-500 p-2 mt-2 rounded-lg"
+      >
+        <Text className="text-white font-bold">Force Infestation (Plot 0,0)</Text>
+      </TouchableOpacity> */}
+
+      {/* Uncomment to see infestation status for debugging */}
+      {/* <InfestationDebugOverlay plots={plots} /> */}
+
+      
+
       {selectedItem && (
-        <View className="absolute top-0 right-0 bg-white/80 p-2 rounded-lg">
+        <View className="absolute top-[-5px] right-[300px] bg-white/80 p-2 rounded-lg">
           <Text className="text-sm font-medium">Selected: {selectedItem.title}</Text>
         </View>
       )}
