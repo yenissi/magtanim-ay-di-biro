@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, TouchableOpacity, Image, Alert, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import type { InventoryItem } from '@/types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type PlantData = {
   id: string;
@@ -14,15 +15,16 @@ type PlantData = {
   hasInfestation: boolean;
   isRotted?: boolean;
   isFertilized: boolean;
+  needsWater?: boolean;
 };
 
 type PlotStatus = {
   isPlowed: boolean;
   isWatered: boolean;
+  isFlooded?: boolean;
   plant?: PlantData;
 };
 
-// Key-value pair to store plot identifiers and their timer IDs
 type TimerMap = {
   [plotId: string]: NodeJS.Timeout;
 };
@@ -54,7 +56,13 @@ const HARVEST_VALUES = {
 const INFESTATION_CHANCE = 1; // 100% chance of infestation
 const INFESTATION_CHECK_INTERVAL = 10000; // Check every 10 seconds
 const DECAY_TIME = 30000; // 30 seconds to treat infestation before decay
-const FERTILIZER_GROWTH_MULTIPLIER = 0.9; // Reduces growth time by 10%
+const FERTILIZER_GROWTH_MULTIPLIER = 0.5 ; // Reduces growth time by 10%
+
+const DROUGHT_CHANCE = 0.1; // 30% chance of drought
+const DROUGHT_CHECK_INTERVAL = 15000; // Check every 15 seconds
+const DROUGHT_DECAY_TIME = 30000; // 30 seconds to water plants before damage
+const FLOOD_CHANCE = 0.1; // 50% chance of flood
+const FLOOD_CHECK_INTERVAL = 30000; // Check every 30 seconds
 
 interface TanimanProps {
   inventory: InventoryItem[];
@@ -67,6 +75,7 @@ interface TanimanProps {
   onSavePlotsState: (plotsData: PlotStatus[][]) => void;
   onUseItem: (item: InventoryItem) => void; 
   onAddToDecompose: (item: InventoryItem) => void;
+  decomposedItems: InventoryItem[];
 }
 
 export const Taniman: React.FC<TanimanProps> = ({ 
@@ -79,16 +88,19 @@ export const Taniman: React.FC<TanimanProps> = ({
   initialPlotsState,
   onSavePlotsState,
   onUseItem,
-  onAddToDecompose
+  onAddToDecompose,
+  decomposedItems
 }) => {
   const GRID_SIZE = 3;
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [refresh, setRefresh] = useState(false);
   const soundTimeoutRef = useRef<NodeJS.Timeout>();
-  
-  // Use refs to store timers outside of state
+
   const infestationTimersRef = useRef<TimerMap>({});
   const decayTimersRef = useRef<TimerMap>({});
+  const droughtTimersRef = useRef<TimerMap>({}); 
+  const droughtDecayTimersRef = useRef<TimerMap>({}); 
+  const floodTimersRef = useRef<TimerMap>({}); 
 
   const triggerRefresh = () => setRefresh(prev => !prev);
 
@@ -125,25 +137,110 @@ export const Taniman: React.FC<TanimanProps> = ({
       // Alert the user
       Alert.alert(
         "Plant Rotted!", 
-        `Your ${plot.plant.cropType} has rotted due to untreated infestation. Harvest value will be reduced.`
+        `Your ${plot.plant.cropType} has rotted due to untreated infestation.`
       );
       
       return newPlots;
     });
   };
+  // New function to handle drought damage
+  const handleDroughtDamage = (row: number, col: number) => {
+    setPlots(current => {
+      const plot = current[row][col];
+      if (!plot.plant || !plot.plant.needsWater) {
+        return current; // No change needed
+      }
+      
+      console.log(`Drought damage triggered for plant at [${row},${col}]`);
+      const newPlots = [...current];
+      newPlots[row] = [...newPlots[row]];
+      newPlots[row][col] = {
+        ...newPlots[row][col],
+        plant: {
+          ...newPlots[row][col].plant!,
+          isRotted: true,
+          needsWater: false
+        }
+      };
+      
+      // Alert the user
+      Alert.alert(
+        "Plant Withered!", 
+        `Your ${plot.plant.cropType} has withered due to drought. Harvest value will be reduced.`
+      );
+      
+      return newPlots;
+    });
+  };
+   // New function to handle flooding
+   const handleFlood = (row: number, col: number) => {
+    setPlots(current => {
+      const plot = current[row][col];
+      if (!plot.plant || plot.isFlooded) {
+        return current; // No change needed
+      }
+      
+      console.log(`Flood triggered for plot at [${row},${col}]`);
+      
+      // Record plant loss in statistics
+      if (plot.plant) {
+        onUpdateStatistics({ plantsLost: 1 });
+      }
+      
+      const newPlots = [...current];
+      newPlots[row] = [...newPlots[row]];
+      newPlots[row][col] = {
+        isPlowed: false,
+        isWatered: false,
+        isFlooded: true,
+        plant: undefined
+      };
+      
+      // Clear all timers for this plot
+      clearPlotTimers(row, col);
+      
+      // Alert the user
+      Alert.alert(
+        "Oh No!", 
+        `Your plot has been flooded and all crops were washed away!`
+      );
+      
+      // Play flood sound
+      playTimedSound(require('@/assets/sound/water.mp3'));
+      
+      return newPlots;
+    });
+    
+    // After a delay, the flood recedes
+    setTimeout(() => {
+      setPlots(current => {
+        const newPlots = [...current];
+        newPlots[row] = [...newPlots[row]];
+        newPlots[row][col] = {
+          isPlowed: false,
+          isWatered: false,
+          isFlooded: false,
+          plant: undefined
+        };
+        return newPlots;
+      });
+    }, 10000); // Flood recedes after 10 seconds
+  };
 
   // Save plots state whenever it changes
   useEffect(() => {
     onSavePlotsState(plots);
-    console.log('Updated plots state:', JSON.stringify(plots, null, 2));
+    // console.log('Updated plots state:', JSON.stringify(plots, null, 2));
   }, [plots]);
 
   const [timers, setTimers] = useState<{
     growth: { [plotId: string]: number };
     decay: { [plotId: string]: number };
+    drought: { [plotId: string]: number }; 
   }>({
     growth: {},
     decay: {},
+    drought: {},
   });
 
   const formatTime = (seconds: number) => {
@@ -156,7 +253,7 @@ export const Taniman: React.FC<TanimanProps> = ({
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date().getTime();
-      const newTimers = { growth: {}, decay: {} };
+      const newTimers = { growth: {}, decay: {}, drought: {} };
 
       plots.forEach((row, rowIndex) => {
         row.forEach((plot, colIndex) => {
@@ -179,6 +276,17 @@ export const Taniman: React.FC<TanimanProps> = ({
                 handlePlantDecay(rowIndex, colIndex);
               }
             }
+            // Drought timer
+            if (plot.plant.needsWater && !plot.plant.isRotted) {
+              const droughtStartTime = plot.plant.readyAt.getTime(); // Using same timing mechanism
+              const droughtTimeRemaining = Math.max(0, droughtStartTime + DROUGHT_DECAY_TIME - now);
+              newTimers.drought[plotId] = droughtTimeRemaining;
+
+              // Check if drought timer has reached zero - apply withering immediately
+              if (droughtTimeRemaining === 0 && plot.plant.needsWater) {
+                handleDroughtDamage(rowIndex, colIndex);
+              }
+            }
           }
         });
       });
@@ -193,14 +301,18 @@ export const Taniman: React.FC<TanimanProps> = ({
   useEffect(() => {
     // First, clear any existing timers
     clearAllTimers();
-    
     // Then set up new timers for all existing plants
     plots.forEach((row, rowIndex) => {
       row.forEach((plot, colIndex) => {
         if (plot.plant && plot.plant.stage === 3 && !plot.plant.isRotted) {
-          const plotId = `${rowIndex}-${colIndex}`;
+          // Start infestation checks
           startInfestationCheck(rowIndex, colIndex);
+          
+          // Start drought checks
+          startDroughtCheck(rowIndex, colIndex);
         }
+        // Start flood checks for all plots
+        startFloodCheck(rowIndex, colIndex);
       });
     });
     
@@ -228,6 +340,25 @@ export const Taniman: React.FC<TanimanProps> = ({
       clearTimeout(timer);
     });
     decayTimersRef.current = {};
+
+    // Clear all drought timers
+    Object.values(droughtTimersRef.current).forEach(timer => {
+      clearInterval(timer);
+    });
+    droughtTimersRef.current = {};
+    
+    // Clear all drought decay timers
+    Object.values(droughtDecayTimersRef.current).forEach(timer => {
+      clearTimeout(timer);
+    });
+    droughtDecayTimersRef.current = {};
+    
+    // Clear all flood timers
+    Object.values(floodTimersRef.current).forEach(timer => {
+      clearInterval(timer);
+    });
+    floodTimersRef.current = {};
+
   };
 
   const clearPlotTimers = (row: number, col: number) => {
@@ -243,6 +374,23 @@ export const Taniman: React.FC<TanimanProps> = ({
     if (decayTimersRef.current[plotId]) {
       clearTimeout(decayTimersRef.current[plotId]);
       delete decayTimersRef.current[plotId];
+    }
+    // Clear drought timer if exists
+    if (droughtTimersRef.current[plotId]) {
+      clearInterval(droughtTimersRef.current[plotId]);
+      delete droughtTimersRef.current[plotId];
+    }
+    
+    // Clear drought decay timer if exists
+    if (droughtDecayTimersRef.current[plotId]) {
+      clearTimeout(droughtDecayTimersRef.current[plotId]);
+      delete droughtDecayTimersRef.current[plotId];
+    }
+    
+    // Clear flood timer if exists
+    if (floodTimersRef.current[plotId]) {
+      clearInterval(floodTimersRef.current[plotId]);
+      delete floodTimersRef.current[plotId];
     }
   };
 
@@ -340,6 +488,93 @@ export const Taniman: React.FC<TanimanProps> = ({
     console.log(`Started infestation check for plant at [${row},${col}]`);
     return timer;
   };
+  // New function for drought checks
+  const startDroughtCheck = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    
+    // Clear any existing timer first
+    if (droughtTimersRef.current[plotId]) {
+      clearInterval(droughtTimersRef.current[plotId]);
+    }
+    
+    // Create new drought check timer
+    const timer = setInterval(() => {
+      setPlots(current => {
+        const plot = current[row][col];
+        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted || plot.plant.needsWater) {
+          return current; // No change needed
+        }
+        
+        // Apply drought with the defined chance
+        if (Math.random() < DROUGHT_CHANCE) {
+          console.log(`Drought triggered for plant at [${row},${col}]`);
+          
+          const newPlots = [...current];
+          newPlots[row] = [...newPlots[row]];
+          newPlots[row][col] = {
+            ...newPlots[row][col],
+            isWatered: false, // Plant loses its watered status
+            plant: {
+              ...newPlots[row][col].plant!,
+              needsWater: true
+            }
+          };
+          
+          // Start the drought decay timer
+          startDroughtDecayTimer(row, col);
+          
+          // Alert the user
+          Alert.alert(
+            "Drought!", 
+            `Your ${plot.plant.cropType} needs water! Use Regadera to prevent withering.`
+          );
+          
+          return newPlots;
+        }
+        
+        return current; // No changes
+      });
+    }, DROUGHT_CHECK_INTERVAL);
+    
+    // Store the timer ID
+    droughtTimersRef.current[plotId] = timer;
+    
+    console.log(`Started drought check for plant at [${row},${col}]`);
+    return timer;
+  };
+  // New function for flood checks
+  const startFloodCheck = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    
+    // Clear any existing timer first
+    if (floodTimersRef.current[plotId]) {
+      clearInterval(floodTimersRef.current[plotId]);
+    }
+    
+    // Create new flood check timer
+    const timer = setInterval(() => {
+      setPlots(current => {
+        const plot = current[row][col];
+        if (plot.isFlooded) {
+          return current; // No change needed if already flooded
+        }
+        
+        // Apply flood with the defined chance
+        if (Math.random() < FLOOD_CHANCE) {
+          // Handle the flood in a separate function
+          handleFlood(row, col);
+        }
+        
+        return current; // This will be updated by handleFlood if needed
+      });
+    }, FLOOD_CHECK_INTERVAL);
+    
+    // Store the timer ID
+    floodTimersRef.current[plotId] = timer;
+    
+    // console.log(`Started flood check for plot at [${row},${col}]`);
+    return timer;
+  };
 
   const startDecayTimer = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
@@ -402,8 +637,73 @@ export const Taniman: React.FC<TanimanProps> = ({
       </View>
     );
   };
+  // New function for drought decay timer
+  const startDroughtDecayTimer = (row: number, col: number) => {
+    const plotId = `${row}-${col}`;
+    // Clear any existing drought decay timer first
+    if (droughtDecayTimersRef.current[plotId]) {
+      clearTimeout(droughtDecayTimersRef.current[plotId]);
+    }
+    const timer = setTimeout(() => {
+      setPlots(current => {
+        const plot = current[row][col];
+        if (!plot.plant || !plot.plant.needsWater || plot.plant.isRotted) {
+          return current; // No change needed
+        }
+        console.log(`Drought decay timer triggered for plant at [${row},${col}]`);
+        const newPlots = [...current];
+        newPlots[row] = [...newPlots[row]];
+        newPlots[row][col] = {
+          ...newPlots[row][col],
+          plant: {
+            ...newPlots[row][col].plant!,
+            isRotted: true,
+            needsWater: false
+          }
+        };
+        
+        // Alert the user
+        Alert.alert(
+          "Plant Withered!", 
+          `Your ${plot.plant.cropType} has withered due to drought. Harvest value will be reduced.`
+        );
+        return newPlots;
+      });
+    }, DROUGHT_DECAY_TIME);
+    droughtDecayTimersRef.current[plotId] = timer;
+    console.log(`Started drought decay timer for plant at [${row},${col}]`);
+    return timer;
+  };
 
-  // Growth timer for plants
+  const WeatherDebugOverlay = ({ plots }: { plots: PlotStatus[][] }) => {
+    return (
+      <View style={{
+        position: 'absolute', 
+        top: 10, 
+        left: 10, 
+        backgroundColor: 'rgba(0,0,0)', 
+        padding: 10
+      }}>
+        {plots.map((row, rowIndex) => (
+          row.map((plot, colIndex) => (
+            <Text key={`${rowIndex}-${colIndex}`} style={{color: 'white'}}>
+              Plot [{rowIndex},{colIndex}]: 
+              {plot.isFlooded ? '🌊 FLOODED' : ''}
+              {plot.plant ? (
+                <>
+                  {' '} Stage {plot.plant.stage}, 
+                  {plot.plant.needsWater ? '🏜️ DROUGHT' : '💧 Watered'}, 
+                  {plot.plant.hasInfestation ? '🐛 Infested' : '✅ Healthy'},
+                  {plot.plant.isRotted ? '💀 Rotted' : ''}
+                </>
+              ) : ' Empty'}
+            </Text>
+          ))
+        ))}
+      </View>
+    );
+  };
+
   useEffect(() => {
     const growthTimer = setInterval(() => {
       setPlots(currentPlots => {
@@ -421,6 +721,8 @@ export const Taniman: React.FC<TanimanProps> = ({
                 if (newStage === 3) {
                   // Start infestation checks now that the plant is mature
                   startInfestationCheck(rowIndex, colIndex);
+                  // Start drought checks now that the plant is mature
+                  startDroughtCheck(rowIndex, colIndex);
                 }
                 
                 return {
@@ -442,7 +744,7 @@ export const Taniman: React.FC<TanimanProps> = ({
     return () => clearInterval(growthTimer);
   }, []);
 
-  const handleHarvest = (row: number, col: number, plot: PlotStatus) => {
+  const handleHarvest = async (row: number, col: number, plot: PlotStatus) => {
     if (plot.plant?.stage === 3) {
       const cropType = plot.plant.cropType as keyof typeof HARVEST_VALUES;
       let harvestValue = plot.plant.isRotted 
@@ -467,9 +769,20 @@ export const Taniman: React.FC<TanimanProps> = ({
         image: plot.plant.image
       };
       
-      // CHANGED: Route the harvested crop based on whether it's rotted or not
       if (plot.plant.isRotted) {
-        // Send rotted crops to the DecomposeModal instead of regular inventory
+        // Save the rotted crop to AsyncStorage
+        try {
+          const existingRottedItems = await AsyncStorage.getItem('rottedItems');
+          const rottedItems = existingRottedItems ? JSON.parse(existingRottedItems) : [];
+          rottedItems.push(harvestedCrop);
+          await AsyncStorage.setItem('rottedItems', JSON.stringify(rottedItems));
+  
+          console.log('Rotted crop saved to AsyncStorage:', harvestedCrop);
+        } catch (error) {
+          console.error('Error saving rotted crop to AsyncStorage:', error);
+        }
+  
+        // Send rotted crops to the DecomposeModal
         onAddToDecompose(harvestedCrop);
         Alert.alert(
           'Harvest Complete!',
@@ -483,21 +796,12 @@ export const Taniman: React.FC<TanimanProps> = ({
           `${cropType} has been harvested and added to your bag.`
         );
       }
-      
-      // Update statistics
-      onUpdateStatistics({ 
-        plantsGrown: 1
-      });
-      
-      Alert.alert(
-        'Harvest Complete!',
-        plot.plant.isRotted 
-          ? `${cropType} was rotted but still harvested with reduced value.`
-          : `${cropType} has been harvested and added to your bag.`
-      );
   
       // Clear all timers for the plot
       clearPlotTimers(row, col);
+
+      onUpdateStatistics({ plantsGrown: 1 });
+
   
       setPlots(current => {
         const newPlots = [...current];
@@ -509,7 +813,7 @@ export const Taniman: React.FC<TanimanProps> = ({
         };
         return newPlots;
       });
-      
+  
       playTimedSound(require('@/assets/sound/harvesting.mp3'));
     }
   };
@@ -518,8 +822,34 @@ export const Taniman: React.FC<TanimanProps> = ({
     if (!selectedItem) {
       return;
     }
-    
     const plot = plots[row][col];
+    // If plot is flooded, only allow draining
+    if (plot.isFlooded) {
+      if (selectedItem.title === 'Regadera') {
+        // Use Regadera to drain the flooded plot
+        setPlots(current => {
+          const newPlots = [...current];
+          newPlots[row] = [...newPlots[row]];
+          newPlots[row][col] = {
+            isPlowed: false,
+            isWatered: false,
+            isFlooded: false,
+            plant: undefined
+          };
+          return newPlots;
+        });
+        
+        Alert.alert("Plot Drained", "You've successfully drained the flooded plot.");
+        playTimedSound(require('@/assets/sound/water.mp3'));
+        onUseItem(selectedItem);
+        // Start flood checks again
+        startFloodCheck(row, col);
+        return;
+      } else {
+        Alert.alert("Plot Flooded", "This plot is flooded. Use Regadera to drain it first.");
+        return;
+      }
+    }
   
     switch (selectedItem.title) {
       case 'Asarol':
@@ -553,7 +883,31 @@ export const Taniman: React.FC<TanimanProps> = ({
           });
           playTimedSound(require('@/assets/sound/water.mp3'));
           onUseItem(selectedItem);
-
+        } else if (plot.plant?.needsWater) {
+          // Fix: Handle watering plants during drought
+          setPlots(current => {
+            const newPlots = [...current];
+            newPlots[row] = [...newPlots[row]];
+            
+            // Clear the drought decay timer if it exists
+            if (droughtDecayTimersRef.current[`${row}-${col}`]) {
+              clearTimeout(droughtDecayTimersRef.current[`${row}-${col}`]);
+              delete droughtDecayTimersRef.current[`${row}-${col}`];
+            }
+            
+            newPlots[row][col] = {
+              ...plot,
+              isWatered: true,
+              plant: {
+                ...plot.plant,
+                needsWater: false
+              }
+            };
+            return newPlots;
+          });
+          Alert.alert("Plant Watered", "You've saved your plant from drought!");
+          playTimedSound(require('@/assets/sound/water.mp3'));
+          onUseItem(selectedItem);
         } else if (!plot.isPlowed) {
           Alert.alert("Not Plowed", "You need to plow this plot first.");
         } else if (plot.isWatered) {
@@ -707,6 +1061,10 @@ export const Taniman: React.FC<TanimanProps> = ({
     if (plant.hasInfestation) {
       return require('@/assets/images/infe.png');
     }
+
+    if (plant.needsWater) {
+      return require('@/assets/images/drought.png');
+    }
     
     switch (plant.stage) {
       case 0:
@@ -747,6 +1105,38 @@ export const Taniman: React.FC<TanimanProps> = ({
       return newPlots;
     });
   };
+  // test drought
+  const testDrought = (row: number, col: number) => {
+    setPlots(current => {
+      const newPlots = [...current];
+      newPlots[row] = [...newPlots[row]];
+
+      if (newPlots[row][col].plant) {
+        newPlots[row][col] = {
+          ...newPlots[row][col],
+          isWatered: false,
+          plant: {
+            ...newPlots[row][col].plant!,
+            needsWater: true
+          }
+        };
+        // Start drought decay timer
+        startDroughtDecayTimer(row, col);
+        console.log('🏜️ FORCED Drought:', {
+          row, 
+          col, 
+          droughtStatus: newPlots[row][col].plant.needsWater
+        });
+        Alert.alert('Drought Forced', 'Drought manually set to true');
+      }
+      return newPlots;
+    });
+  };
+  // test flood 
+  const testFlood = (row: number, col: number) => {
+    handleFlood(row, col);
+    Alert.alert('Flood Forced', 'Flood manually triggered');
+  };
 
   return (
     <View className="absolute bottom-[100px] left-[300px]">
@@ -775,35 +1165,45 @@ export const Taniman: React.FC<TanimanProps> = ({
                       resizeMode="contain"
                     />
                     {plot.plant.stage === 3 && (
-                      <View className="absolute top-0 right-0 bg-yellow-400 rounded-bl-lg p-1">
-                        <Text className="text-xs">✓</Text>
+                      <View className="absolute top-0 right-0 bg-green-500 rounded-bl-lg p-[1px]">
+                        <Text className="text-[8px]">✓</Text>
                       </View>
                     )}
                     {plot.plant.hasInfestation && !plot.plant.isRotted && (
-                      <View className="absolute bottom-0 left-0 bg-red-500 rounded-br-lg p-1">
-                        <Text className="text-xs font-bold">🐛</Text>
+                      <View className="absolute bottom-0 left-0 bg-red-500 rounded-br-lg ">
+                        <Text className="text-[8px]">🐛</Text>
+                      </View>
+                    )}
+                    {plot.plant.needsWater && !plot.plant.isRotted && (
+                      <View className="absolute top-0 left-0 bg-amber-500 rounded-br-lg p-[1px]">
+                        <Text className="text-[7px]">🏜️</Text>
                       </View>
                     )}
                     {plot.plant.isRotted && (
-                      <View className="absolute bottom-0 left-0 bg-brown-500 rounded-br-lg p-1">
-                        <Text className="text-xs font-bold">💀</Text>
+                      <View className="absolute bottom-0 left-0 bg-brown-500 rounded-br-lg p-[1px]">
+                        <Text className="text-[8px]">💀</Text>
                       </View>
                     )}
                     {plot.plant.isFertilized && (
-                      <View className="absolute bottom-0 right-0 bg-green-500 rounded-tl-lg p-1">
-                        <Text className="text-xs">⚡</Text>
+                      <View className="absolute top-0 left-0 bg-green-500 rounded-tl-lg p-[1px]">
+                        <Text className="text-[7px]">⚡</Text>
                       </View>
                     )}
                     {/* Display Timers */}
-                    <View className="absolute bottom-0 left-0 right-0 bg-black/50 p-1">
+                    <View className="absolute bottom-0 left-0 right-0 ">
                       {plot.plant.stage < 3 && (
-                        <Text className="text-white text-[5px] text-center">
-                          Grow: {formatTime(timers.growth[`${rowIndex}-${colIndex}`] / 1000)}
+                        <Text className="text-black text-[7px] font-medium text-right">
+                          {formatTime(timers.growth[`${rowIndex}-${colIndex}`] / 1000)}
                         </Text>
                       )}
                       {plot.plant.hasInfestation && !plot.plant.isRotted && (
-                        <Text className="text-white text-[5px] text-center">
-                          Decay: {formatTime(timers.decay[`${rowIndex}-${colIndex}`] / 1000)}
+                        <Text className="text-red text-[7px] font-medium text-right">
+                          {formatTime(timers.decay[`${rowIndex}-${colIndex}`] / 1000)}
+                        </Text>
+                      )}
+                      {plot.plant.needsWater && !plot.plant.isRotted && (
+                        <Text className="text-blue text-[7px] font-medium text-right">
+                          {formatTime(timers.drought[`${rowIndex}-${colIndex}`] / 1000)}
                         </Text>
                       )}
                     </View>
@@ -815,15 +1215,31 @@ export const Taniman: React.FC<TanimanProps> = ({
         ))}
       </View>
 
-      {/* Debug Button - Uncomment to test infestation */}
+      {/* Debug infestation */}
       {/* <TouchableOpacity 
         onPress={() => testInfestation(0, 0)} 
         className="bg-red-500 p-2 mt-2 rounded-lg"
       >
         <Text className="text-white font-bold">Force Infestation (Plot 0,0)</Text>
       </TouchableOpacity> */}
+      
+      {/* Debug drought */}
+      {/* <TouchableOpacity 
+        onPress={() => testDrought(0, 0)} 
+        className="bg-yellow-500 p-2 mt-2 rounded-lg"
+      >
+        <Text className="text-white font-bold">Force Drought (Plot 0,0)</Text>
+      </TouchableOpacity> */}
+      
+      {/* Debug flood */}
+      {/* <TouchableOpacity 
+        onPress={() => testFlood(0, 0)} 
+        className="bg-blue-500 p-2 mt-2 rounded-lg"
+      >
+        <Text className="text-white font-bold">Force Flood (Plot 0,0)</Text>
+      </TouchableOpacity> */}
 
-      {/* Uncomment to see infestation status for debugging */}
+      {/* infestation status for debugging */}
       {/* <InfestationDebugOverlay plots={plots} /> */}
 
       

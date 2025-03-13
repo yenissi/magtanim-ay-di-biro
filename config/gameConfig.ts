@@ -168,6 +168,7 @@ export const INITIAL_GAME_STATE = {
       plantsGrown: 0,
       moneyEarned: 0,
       missionsCompleted: 0,
+      decomposeCrops:[],
     },
   };
   
@@ -232,7 +233,7 @@ export const INITIAL_GAME_STATE = {
       id: 8,
       title: "Chemical Pesticide",
       description: "Used to protect crops from pests and insects",
-      price: 50,
+      price: 100,
       type: "tool",
       image: require('@/assets/images/chemical.png'),
     },
@@ -240,7 +241,7 @@ export const INITIAL_GAME_STATE = {
       id: 9,
       title: "Synthetic Fertilizer",
       description: "Improves soil nutrients for better crop growth",
-      price: 200,
+      price: 100,
       type: "tool",
       image: require('@/assets/images/fertilizer.png'),
     },

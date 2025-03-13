@@ -141,9 +141,11 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
 
   const [selectedTab, setSelectedTab] = useState('All');
 
-  const filteredItems = selectedTab === 'All' 
-    ? SHOP_ITEMS 
-    : SHOP_ITEMS.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
+  const filteredShopItems = SHOP_ITEMS.filter(item => item.title !== '' && item.title !== 'Itak');
+
+  const displayItems = selectedTab === 'All' 
+    ? filteredShopItems 
+    : filteredShopItems.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
 
   const handlePurchase = async (itemId: number, price: number) => {
     if (userMoney < price) {
@@ -203,7 +205,7 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
           {/* Filtered Items */}
           <ScrollView horizontal>
             <View className="flex-row gap-4">
-              {filteredItems.map((item) => (
+              {displayItems.map((item) => (
                 <FlipCard key={item.id} item={item} onPurchase={handlePurchase} />
               ))}
             </View>

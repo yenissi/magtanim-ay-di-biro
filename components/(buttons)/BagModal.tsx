@@ -21,6 +21,16 @@ interface BagModalProps {
   plots: PlotStatus[][];
 }
 
+const DEFAULT_ITAK: InventoryItem = {
+  id: 'default-itak',
+  title: 'Itak',
+  type: 'tool',
+  description: 'Used for cutting plants or Harvesting',
+  image: require('@/assets/images/itak.png'), // Update path as needed
+  price: 0,
+  sellPrice: 0
+};
+
 export const BagModal = ({ 
   visible, 
   onClose, 
@@ -32,19 +42,26 @@ export const BagModal = ({
   onRemoveItem,
   plots
 }: BagModalProps) => {
-  console.log('BagModal - Current Inventory:', inventory);
-  console.log('BagModal Render - Selected item:', selectedItem);
+  // console.log('BagModal - Current Inventory:', inventory);
+  // console.log('BagModal Render - Selected item:', selectedItem);
 
   // const handleItemSelect = (item: InventoryItem) => {
   //   console.log('Item selected:', item.title);
   //   onSelectItem(selectedItem?.id === item.id ? null : item);
   // };
 
+  const hasItak = inventory.some(item => item.title === 'Itak');
+  const displayInventory = hasItak ? inventory : [...inventory, DEFAULT_ITAK];
+
   const handleItemUse = (item: InventoryItem) => {
     onUseItem(item); // Remove item from inventory
   };
 
   const handleSellItem = (item: InventoryItem) => {
+    if (item.title === 'Itak') {
+      Alert.alert("Cannot Sell", "This essential tool cannot be sold.");
+      return;
+    }
     Alert.alert(
       "Sell Item",
       `Are you sure you want to sell ${item.title} for ${item.sellPrice} coins?`,
@@ -127,6 +144,18 @@ export const BagModal = ({
   };
 
   const renderItemActions = (item: InventoryItem) => {
+      if (item.title === 'Itak') {
+        return (
+          <TouchableOpacity
+            className="rounded-lg p-2 w-full bg-green-400"
+            onPress={() => handleUseItem(item)}
+          >
+            <Text className="text-sm font-medium text-center text-white">
+              Use
+            </Text>
+          </TouchableOpacity>
+        );
+      }
     // Special handling for harvested crops
     if (item.type === 'harvestedCrop') {
       return (
@@ -167,11 +196,11 @@ export const BagModal = ({
           </View>
 
           <ScrollView horizontal className="max-h-96">
-            {inventory.length === 0 ? (
+            {displayInventory.length === 0 ? (
               <Text className="text-center text-gray-600 p-4">Your bag is empty</Text>
             ) : (
               <View className="flex-row flex-wrap gap-4">
-                {inventory.map((item, index) => (
+                {displayInventory.map((item, index) => (
                   <View 
                     key={`${item.id}-${index}`} 
                     className={`rounded-lg p-3 w-40 ${

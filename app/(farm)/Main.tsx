@@ -27,6 +27,7 @@ import type { InventoryItem } from '@/types';
 import { savePlotsState } from '@/firebaseUtils';
 import { DecomposeModal } from '@/components/(buttons)/Decompose';
 import { INITIAL_GAME_STATE } from '@/config/gameConfig';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Define PlotStatus type to match what's being used in Taniman
 type PlotStatus = {
@@ -57,9 +58,8 @@ type PlotStatus = {
   const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions);
   const [rottedCrops, setRottedCrops] = useState<InventoryItem[]>([]);
   const [composeModalVisible, setComposeModalVisible] = useState(false);
-
-
-
+  const [decomposedItems, setDecomposedItems] = useState<InventoryItem[]>([]);
+  
   const [statistics, setStatistics] = useState({
     plantsGrown: 0,
     moneyEarned: 0,
@@ -85,11 +85,43 @@ type PlotStatus = {
     trivia: false,
   });
 
+  useEffect(() => {
+    const loadDecomposedItems = async () => {
+      try {
+        const savedDecomposedItems = await AsyncStorage.getItem('decomposedItems');
+        if (savedDecomposedItems) {
+          setDecomposedItems(JSON.parse(savedDecomposedItems));
+          console.log('Loaded decomposed items from storage');
+        }
+      } catch (error) {
+        console.error('Failed to load decomposed items:', error);
+      }
+    };
+    
+    loadDecomposedItems();
+  }, []);
+
+  // Create a function to save decomposed items
+  const saveDecomposedItems = async (items: InventoryItem[]) => {
+    try {
+      await AsyncStorage.setItem('decomposedItems', JSON.stringify(items));
+      console.log('Saved decomposed items to storage');
+    } catch (error) {
+      console.error('Failed to save decomposed items:', error);
+    }
+  };
+
   const handleAddToDecompose = (item: InventoryItem) => {
     setRottedItems(prev => [...prev, item]);
+    const updatedDecomposedItems = [...decomposedItems, item];
+    setDecomposedItems(updatedDecomposedItems);
+    saveDecomposedItems(updatedDecomposedItems);
   };
   const handleRemoveRottedItem = (itemId: string) => {
     setRottedItems(prev => prev.filter(item => item.id !== itemId));
+  };
+  const handleLoadRottedItems = (items: InventoryItem[]) => {
+    setRottedItems(items);
   };
 
   useEffect(() => {
@@ -119,15 +151,16 @@ type PlotStatus = {
           ? userData.inventory 
           : [];
         
-        console.log('Syncing full user data:', {
-          inventory: fetchedInventory,
-          money: userData.money,
-          plotsState: userData.plotsState
-        });
-        
-        // Update all related states
         setInventory(fetchedInventory);
         setUserMoney(userData.money || 0);
+        // Use initial state as fallback instead of current state
+      const initialPlotState = Array(3).fill(null).map(() => 
+        Array(3).fill(null).map(() => ({
+          isPlowed: false,
+          isWatered: false,
+          plant: undefined
+        }))
+      );
         setPlotsState(userData.plotsState || plots);
         setPlots(userData.plotsState || plots);
       }
@@ -260,27 +293,138 @@ type PlotStatus = {
     }
   };
 
-  // FIX 4: Improved plot state saving
+  // plot state saving
   const handleSavePlotsState = async () => {
-    if (!params.uid) return;
+    if (!params.uid) {
+      console.log("Cannot save plots state: User ID is missing");
+      return;
+    }
     
     try {
-      const sanitizedPlotsState = plots.map(row => 
+      console.log("Saving plots state to Firebase...");
+      
+      // Create a deep copy of the plots array to avoid reference issues
+      const plotsToSave = JSON.parse(JSON.stringify(plots));
+      
+      // Process each plot to ensure there are no undefined values
+      // Firebase doesn't handle undefined values well
+      const sanitizedPlotsState = plotsToSave.map(row => 
         row.map(plot => ({
-          ...plot,
-          plant: plot.plant !== undefined ? plot.plant : null, // Replace undefined with null
+          isPlowed: plot.isPlowed || false,
+          isWatered: plot.isWatered || false,
+          isFlooded: plot.isFlooded || false,
+          // Only include plant data if it exists
+          ...(plot.plant ? {
+            plant: {
+              id: plot.plant.id,
+              stage: plot.plant.stage || 0,
+              type: plot.plant.type || "",
+              plantedAt: plot.plant.plantedAt ? plot.plant.plantedAt.toISOString() : new Date().toISOString(),
+              readyAt: plot.plant.readyAt ? plot.plant.readyAt.toISOString() : new Date().toISOString(),
+              cropType: plot.plant.cropType || "",
+              image: plot.plant.image,
+              hasInfestation: plot.plant.hasInfestation || false,
+              isRotted: plot.plant.isRotted || false,
+              isFertilized: plot.plant.isFertilized || false,
+              needsWater: plot.plant.needsWater || false
+            }
+          } : {})
         }))
       );
-  
+    
+      // Save to Firebase
       await update(ref(Firebase_Database, `users/${params.uid}`), {
         plotsState: sanitizedPlotsState,
       });
-  
+    
       console.log("Plots state saved successfully!");
+      return true;
     } catch (error) {
       console.error("Error saving plots state:", error);
+      return false;
     }
   };
+
+  const handleLogout = async () => {
+    try {
+      // First ensure the latest plots state is saved to Firebase
+      await handleSavePlotsState();
+      console.log("Plots state saved before logout");
+      
+      // Then sign out
+      await signOut(Firebase_Auth);
+      console.log("User signed out successfully");
+      
+      // Navigate to the login screen
+      router.replace("/");
+    } catch (error) {
+      console.error("Error during logout:", error);
+      Alert.alert("Logout Error", "There was a problem logging out. Please try again.");
+    }
+  };
+
+  const loadPlotsState = () => {
+    if (!gameData || !gameData.plotsState) return;
+    
+    try {
+      console.log("Loading plots state from Firebase...");
+      
+      // Process the loaded plots state to convert date strings back to Date objects
+      const loadedPlotsState = gameData.plotsState.map(row => 
+        row.map(plot => ({
+          isPlowed: plot.isPlowed || false,
+          isWatered: plot.isWatered || false,
+          isFlooded: plot.isFlooded || false,
+          // Only process plant if it exists
+          ...(plot.plant ? {
+            plant: {
+              ...plot.plant,
+              // Convert string dates back to Date objects
+              plantedAt: plot.plant.plantedAt ? new Date(plot.plant.plantedAt) : new Date(),
+              readyAt: plot.plant.readyAt ? new Date(plot.plant.readyAt) : new Date()
+            }
+          } : {})
+        }))
+      );
+      
+      console.log("Plots state loaded successfully!");
+      setPlots(loadedPlotsState);
+      setPlotsState(loadedPlotsState);
+    } catch (error) {
+      console.error("Error processing loaded plots state:", error);
+      // Fall back to default plots if there's an error
+      const defaultPlots = Array(3).fill(null).map(() => 
+        Array(3).fill(null).map(() => ({
+          isPlowed: false,
+          isWatered: false,
+          plant: undefined
+        }))
+      );
+      setPlots(defaultPlots);
+      setPlotsState(defaultPlots);
+    }
+  };
+  
+  useEffect(() => {
+    if (gameData) {
+      loadPlotsState();
+    }
+  }, [gameData]);
+  
+  useEffect(() => {
+    const saveInterval = setInterval(() => {
+      handleSavePlotsState();
+    }, 60000); // Save every minute
+    
+    return () => clearInterval(saveInterval);
+  }, [plots]);
+  
+  // Make sure to call handleSavePlotsState when component unmounts
+  useEffect(() => {
+    return () => {
+      handleSavePlotsState();
+    };
+  }, []);
 
   useEffect(() => {
     const lockOrientation = async () => {
@@ -516,6 +660,8 @@ type PlotStatus = {
           onRemoveItem={handleRemoveRottedItem}
           onUpdateMoney={handleUpdateMoney}
           onAddToInventory={handleAddToInventory}
+          decomposedItems={decomposedItems}
+          onLoadRottedItems={handleLoadRottedItems}
           // onUpdateStatistics={handleUpdateStatistics}
         />
 
@@ -562,6 +708,7 @@ type PlotStatus = {
           initialPlotsState={plotsState}
           onSavePlotsState={handleSavePlotsState}
           onUseItem={handleUseItem}
+          decomposedItems={decomposedItems}
           onAddToDecompose={handleAddToDecompose}
         />
       </View>
