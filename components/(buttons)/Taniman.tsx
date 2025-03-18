@@ -3,6 +3,8 @@ import { View, TouchableOpacity, Image, Alert, Text } from 'react-native';
 import { Audio } from 'expo-av';
 import type { InventoryItem } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Firebase_Database, Firebase_Auth } from '@/firebaseConfig';
+import { ref, push, set, get, update, serverTimestamp, onValue, off } from 'firebase/database';
 
 type PlantData = {
   id: string;
@@ -42,15 +44,15 @@ const GROWTH_TIMES = {
 } as const;
 
 const HARVEST_VALUES = {
-  Sibuyas: { normal: 50, rotted: 40 },
-  Mangga: { normal: 150, rotted: 25 },
-  Carrot: { normal: 100, rotted: 20 },
-  Gumamela: { normal: 250, rotted: 30 },
-  Santan: { normal: 150, rotted: 40 },
-  Kamatis: { normal: 100, rotted: 30 },
-  Orchids: { normal: 150, rotted: 40 },
-  Saging: { normal: 100, rotted: 35 },
-  Papaya: { normal: 100, rotted: 25 },
+  Sibuyas: { normal: 50, rotted: 0 },
+  Mangga: { normal: 150, rotted: 0 },
+  Carrot: { normal: 100, rotted: 0 },
+  Gumamela: { normal: 250, rotted: 0 },
+  Santan: { normal: 150, rotted: 0 },
+  Kamatis: { normal: 100, rotted: 0 },
+  Orchids: { normal: 150, rotted: 0 },
+  Saging: { normal: 100, rotted: 0 },
+  Papaya: { normal: 100, rotted: 0 },
 } as const;
 
 const INFESTATION_CHANCE = 1; // 100% chance of infestation
@@ -58,8 +60,8 @@ const INFESTATION_CHECK_INTERVAL = 10000; // Check every 10 seconds
 const DECAY_TIME = 30000; // 30 seconds to treat infestation before decay
 const FERTILIZER_GROWTH_MULTIPLIER = 0.5 ; // Reduces growth time by 10%
 
-const DROUGHT_CHANCE = 0.1; // 30% chance of drought
-const DROUGHT_CHECK_INTERVAL = 15000; // Check every 15 seconds
+const DROUGHT_CHANCE = 0.1; // 10% chance of drought
+const DROUGHT_CHECK_INTERVAL = 10000; // Check every 15 seconds
 const DROUGHT_DECAY_TIME = 30000; // 30 seconds to water plants before damage
 const FLOOD_CHANCE = 0.1; // 50% chance of flood
 const FLOOD_CHECK_INTERVAL = 30000; // Check every 30 seconds
@@ -76,6 +78,7 @@ interface TanimanProps {
   onUseItem: (item: InventoryItem) => void; 
   onAddToDecompose: (item: InventoryItem) => void;
   decomposedItems: InventoryItem[];
+  onAddToNormalInventory: (item: InventoryItem) => void;
 }
 
 export const Taniman: React.FC<TanimanProps> = ({ 
@@ -89,6 +92,7 @@ export const Taniman: React.FC<TanimanProps> = ({
   onSavePlotsState,
   onUseItem,
   onAddToDecompose,
+  onAddToNormalInventory,
   decomposedItems
 }) => {
   const GRID_SIZE = 3;
@@ -114,6 +118,7 @@ export const Taniman: React.FC<TanimanProps> = ({
     )
   );
 
+  
   // Add this new function to handle plant decay directly
   const handlePlantDecay = (row: number, col: number) => {
     setPlots(current => {
@@ -744,22 +749,38 @@ export const Taniman: React.FC<TanimanProps> = ({
     return () => clearInterval(growthTimer);
   }, []);
 
-  const handleHarvest = async (row: number, col: number, plot: PlotStatus) => {
+  const handleHarvest = async (row: number, col: number, plot: PlotStatus, onComplete?: () => void) => {
+    if (plot.plant?.hasInfestation && !plot.plant.isRotted) {
+      Alert.alert(
+        "Cannot Harvest", 
+        "This plant has an infestation. Treat it with pesticide before harvesting, or wait for it to rot."
+      );
+      return;
+    }
     if (plot.plant?.stage === 3) {
       const cropType = plot.plant.cropType as keyof typeof HARVEST_VALUES;
       let harvestValue = plot.plant.isRotted 
         ? HARVEST_VALUES[cropType].rotted 
         : HARVEST_VALUES[cropType].normal;
-      
+  
       // Double harvest value if fertilized
       if (plot.plant.isFertilized) {
         harvestValue *= 2;
       }
   
+      // Create a unique ID using timestamp with microseconds
+      const uniqueTimestamp = Date.now();
+      const randomPart = Math.random().toString(36).substring(2, 11);
+      const uniqueCounter = (global.harvestCounter = (global.harvestCounter || 0) + 1);
+      
+      const uniqueId = plot.plant.isRotted
+        ? `rotted-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`
+        : `normal-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`;
+  
       // Create a harvested crop item to add to inventory
       const harvestedCrop: InventoryItem = {
-        id: `${cropType}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-        title: `${plot.plant.isRotted ? 'Rotted ' : ''}Harvested ${cropType}`,
+        id: uniqueId,
+        title: `${plot.plant.isRotted ? 'Rotted ' : ''} ${cropType}`,
         type: 'harvestedCrop',
         description: plot.plant.isRotted 
           ? `A rotted ${cropType} with reduced value.` 
@@ -768,41 +789,10 @@ export const Taniman: React.FC<TanimanProps> = ({
         sellPrice: harvestValue,
         image: plot.plant.image
       };
-      
-      if (plot.plant.isRotted) {
-        // Save the rotted crop to AsyncStorage
-        try {
-          const existingRottedItems = await AsyncStorage.getItem('rottedItems');
-          const rottedItems = existingRottedItems ? JSON.parse(existingRottedItems) : [];
-          rottedItems.push(harvestedCrop);
-          await AsyncStorage.setItem('rottedItems', JSON.stringify(rottedItems));
   
-          console.log('Rotted crop saved to AsyncStorage:', harvestedCrop);
-        } catch (error) {
-          console.error('Error saving rotted crop to AsyncStorage:', error);
-        }
+      console.log('Harvested crop created:', harvestedCrop);
   
-        // Send rotted crops to the DecomposeModal
-        onAddToDecompose(harvestedCrop);
-        Alert.alert(
-          'Harvest Complete!',
-          `Rotted ${cropType} has been sent to compost.`
-        );
-      } else {
-        // Add normal crops to inventory
-        onAddToInventory(harvestedCrop);
-        Alert.alert(
-          'Harvest Complete!',
-          `${cropType} has been harvested and added to your bag.`
-        );
-      }
-  
-      // Clear all timers for the plot
-      clearPlotTimers(row, col);
-
-      onUpdateStatistics({ plantsGrown: 1 });
-
-  
+      // Clear the plot after harvesting
       setPlots(current => {
         const newPlots = [...current];
         newPlots[row] = [...newPlots[row]];
@@ -813,12 +803,288 @@ export const Taniman: React.FC<TanimanProps> = ({
         };
         return newPlots;
       });
+      await savePlantsToFirebase();
+      clearPlotTimers(row, col);
   
+      const userId = Firebase_Auth.currentUser?.uid;
+  
+      // Update statistics first
+      if (userId) {
+        // Get current statistics
+        const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
+        const statsSnapshot = await get(userStatsRef);
+        const currentStats = statsSnapshot.val() || { 
+          rottedHarvested: 0, 
+          normalHarvested: 0,
+          itemsSold: 0 
+        };
+        
+        // Update the appropriate statistic
+        if (plot.plant.isRotted) {
+          currentStats.rottedHarvested = (currentStats.rottedHarvested || 0) + 1;
+        } else {
+          currentStats.normalHarvested = (currentStats.normalHarvested || 0) + 1;
+        }
+        
+        // Save updated statistics
+        await set(userStatsRef, currentStats);
+      }
+  
+      // Handle different item types
+      if (plot.plant.isRotted) {
+        // Handle rotted crops - just save to Firebase, callbacks will handle UI updates
+        if (userId) {
+          const rottedItemsRef = ref(Firebase_Database, `users/${userId}/rottedItems/${harvestedCrop.id}`);
+          await set(rottedItemsRef, harvestedCrop);
+          console.log('Rotted crop saved to Firebase');
+          
+          // No need to manually call onAddToDecompose here since the Firebase listener will handle it
+          Alert.alert(
+            'Harvest Complete!',
+            `Rotted ${cropType} has been sent to compost.`
+          );
+        } else {
+          // If user is not signed in, update UI directly
+          onAddToDecompose(harvestedCrop);
+          Alert.alert(
+            'Harvest Complete!',
+            `Rotted ${cropType} has been sent to compost. Sign in to save your progress!`
+          );
+        }
+      } else {
+        // Handle normal crops - just save to Firebase, callbacks will handle UI updates
+        if (userId) {
+          const normalItemsRef = ref(Firebase_Database, `users/${userId}/normalItems/${harvestedCrop.id}`);
+          await set(normalItemsRef, harvestedCrop);
+          console.log('Normal crop saved to Firebase');
+          
+          // No need to manually call onAddToNormalInventory here since the Firebase listener will handle it
+          Alert.alert(
+            'Harvest Complete!',
+            `${cropType} has been harvested and added to your inventory.`
+          );
+        } else {
+          // If user is not signed in, update UI directly
+          if (typeof onAddToNormalInventory === 'function') {
+            onAddToNormalInventory(harvestedCrop);
+          }
+          Alert.alert(
+            'Harvest Complete!',
+            `${cropType} has been harvested and added to your inventory. Sign in to save your progress!`
+          );
+        }
+      }
+  
+      // Update local statistics
+      onUpdateStatistics({ plantsGrown: 1 });
       playTimedSound(require('@/assets/sound/harvesting.mp3'));
+  
+      if (onComplete) {
+        onComplete();
+      }
     }
   };
 
-  const handlePlotPress = (row: number, col: number) => {
+  const savePlantsToFirebase = async () => {
+    const userId = Firebase_Auth.currentUser?.uid;
+    if (!userId) return;
+  
+    try {
+      // Convert plots to a serializable format and filter out undefined values
+      const serializablePlots = plots.map(row => 
+        row.map(plot => {
+          // Create a clean plot object without undefined values
+          const cleanPlot = {
+            isPlowed: !!plot.isPlowed,
+            isWatered: !!plot.isWatered,
+            isFlooded: plot.isFlooded || false
+          };
+          
+          // Only add plant if it exists
+          if (plot.plant) {
+            cleanPlot.plant = {
+              id: plot.plant.id,
+              stage: plot.plant.stage,
+              type: plot.plant.type,
+              plantedAt: plot.plant.plantedAt.getTime(),
+              readyAt: plot.plant.readyAt.getTime(),
+              cropType: plot.plant.cropType,
+              image: plot.plant.image,
+              hasInfestation: !!plot.plant.hasInfestation,
+              isRotted: !!plot.plant.isRotted,
+              isFertilized: !!plot.plant.isFertilized,
+              needsWater: !!plot.plant.needsWater
+            };
+          }
+          
+          return cleanPlot;
+        })
+      );
+  
+      // Save to Firebase
+      const plotsRef = ref(Firebase_Database, `users/${userId}/plots`);
+      await set(plotsRef, serializablePlots);
+      console.log('Plots saved to Firebase successfully');
+    } catch (error) {
+      console.error('Error saving plots to Firebase:', error);
+    }
+  };
+  
+  
+  // Add function to load planted crops from Firebase
+  const loadPlantsFromFirebase = async () => {
+    const userId = Firebase_Auth.currentUser?.uid;
+    if (!userId) return false;
+  
+    try {
+      const plotsRef = ref(Firebase_Database, `users/${userId}/plots`);
+      const snapshot = await get(plotsRef);
+      const savedPlots = snapshot.val();
+      
+      if (!savedPlots) {
+        console.log('No saved plots found in Firebase');
+        return false;
+      }
+      
+      console.log('Found plots data in Firebase:', savedPlots);
+      
+      // Clear all existing timers first
+      clearAllTimers();
+      
+      // Convert dates back to Date objects
+      const deserializedPlots = savedPlots.map((row) => 
+        row.map((plot) => {
+          // Handle null or undefined plot
+          if (!plot) return {
+            isPlowed: false,
+            isWatered: false
+          };
+          
+          // Create a new plot object with defaults
+          const newPlot = {
+            isPlowed: plot.isPlowed || false,
+            isWatered: plot.isWatered || false,
+            isFlooded: plot.isFlooded || false
+          };
+          
+          // Only add plant if it exists in the data
+          if (plot.plant) {
+            newPlot.plant = {
+              ...plot.plant,
+              plantedAt: new Date(plot.plant.plantedAt),
+              readyAt: new Date(plot.plant.readyAt),
+              hasInfestation: !!plot.plant.hasInfestation,
+              isRotted: !!plot.plant.isRotted,
+              isFertilized: !!plot.plant.isFertilized,
+              needsWater: !!plot.plant.needsWater
+            };
+          }
+          
+          return newPlot;
+        })
+      );
+      
+      // Update the state
+      setPlots(deserializedPlots);
+      console.log('Plots loaded from Firebase successfully');
+      
+      // Setup timers for loaded plants after state is updated
+      setTimeout(() => {
+        deserializedPlots.forEach((row, rowIndex) => {
+          row.forEach((plot, colIndex) => {
+            // Start flood checks for all plots
+            startFloodCheck(rowIndex, colIndex);
+            
+            // Only proceed if there's a plant
+            if (plot.plant) {
+              // Handle growing plants (stages 0-2)
+              if (plot.plant.stage < 3) {
+                // No special timers needed, the growth timer will handle this
+                console.log(`Setting up growth timer for plant at [${rowIndex},${colIndex}]`);
+              } 
+              // Handle mature plants (stage 3)
+              else if (plot.plant.stage === 3) {
+                console.log(`Setting up stage 3 timers for plant at [${rowIndex},${colIndex}]`);
+                
+                if (!plot.plant.isRotted) {
+                  // Start infestation check for healthy mature plants
+                  startInfestationCheck(rowIndex, colIndex);
+                  
+                  // Start drought check for healthy mature plants
+                  startDroughtCheck(rowIndex, colIndex);
+                  
+                  // If plant has infestation but not rotted yet, start decay timer
+                  if (plot.plant.hasInfestation) {
+                    console.log(`Starting decay timer for infested plant at [${rowIndex},${colIndex}]`);
+                    startDecayTimer(rowIndex, colIndex);
+                  }
+                  
+                  // If plant needs water but not rotted yet, start drought decay timer
+                  if (plot.plant.needsWater) {
+                    console.log(`Starting drought decay timer for plant at [${rowIndex},${colIndex}]`);
+                    startDroughtDecayTimer(rowIndex, colIndex);
+                  }
+                }
+              }
+            }
+          });
+        });
+      }, 100); // Small delay to ensure state is updated first
+      
+      return true; // Successfully loaded data
+    } catch (error) {
+      console.error('Error loading plots from Firebase:', error);
+      return false; // Failed to load data
+    }
+  };
+  
+
+  useEffect(() => {
+    const loadData = async () => {
+      // First try to load from Firebase if user is logged in
+      const userId = Firebase_Auth.currentUser?.uid;
+      if (userId) {
+        try {
+          console.log('Attempting to load plots from Firebase...');
+          const loaded = await loadPlantsFromFirebase();
+          console.log('Firebase load result:', loaded);
+          
+          // If Firebase load failed and we have initial state, use that
+          if (!loaded && initialPlotsState) {
+            console.log('Using initial state from props instead');
+            setPlots(initialPlotsState);
+            // Save this initial state to Firebase immediately
+            setTimeout(() => savePlantsToFirebase(), 500);
+          }
+        } catch (error) {
+          console.error('Error in initial data loading:', error);
+          // Fallback to initial state
+          if (initialPlotsState) {
+            setPlots(initialPlotsState);
+          }
+        }
+      } 
+      // If not logged in but we have initial state, use that
+      else if (initialPlotsState) {
+        console.log('User not logged in, using initial state from props');
+        setPlots(initialPlotsState);
+      }
+    };
+    
+    loadData();
+    
+    // Add auth state listener to reload when user logs in
+    const unsubscribe = Firebase_Auth.onAuthStateChanged((user) => {
+      console.log('Auth state changed, user:', user?.uid);
+      if (user) {
+        loadData(); // Reload data when user logs in
+      }
+    });
+    
+    return () => unsubscribe(); // Clean up listener
+  }, []);  
+  
+  const handlePlotPress = (row: number, col: number) => { 
     if (!selectedItem) {
       return;
     }
@@ -841,7 +1107,9 @@ export const Taniman: React.FC<TanimanProps> = ({
         
         Alert.alert("Plot Drained", "You've successfully drained the flooded plot.");
         playTimedSound(require('@/assets/sound/water.mp3'));
+
         onUseItem(selectedItem);
+
         // Start flood checks again
         startFloodCheck(row, col);
         return;
@@ -850,9 +1118,10 @@ export const Taniman: React.FC<TanimanProps> = ({
         return;
       }
     }
-  
+    
     switch (selectedItem.title) {
       case 'Asarol':
+        console.log('Asarol selected in switch:', selectedItem);
         if (!plot.isPlowed) {
           setPlots(current => {
             const newPlots = [...current];
@@ -914,16 +1183,24 @@ export const Taniman: React.FC<TanimanProps> = ({
           Alert.alert("Already Watered", "This plot has already been watered.");
         }
         break;
-  
+      
       case 'Itak':
-        if (plot.plant?.stage === 3) {
-          handleHarvest(row, col, plot);
-        } else if (plot.plant) {
-          Alert.alert("Not Ready", "This plant is not ready for harvest yet.");
+        if (plot.plant && plot.plant.stage === 3) {
+          if (plot.plant.hasInfestation && !plot.plant.isRotted) {
+            Alert.alert(
+              "Cannot Harvest", 
+              "This plant has an infestation. Treat it with pesticide before harvesting, or wait for it to rot."
+            );
+            return;
+          }
+          handleHarvest(row, col, plot, () => {
+            onUseItem(selectedItem);
+          });
         } else {
-          Alert.alert("Nothing to Harvest", "There is no plant to harvest in this plot.");
+          Alert.alert("Not Ready", "This plant is not ready for harvest yet.");
         }
         break;
+        
   
         case "Chemical Pesticide":
           if (plot.plant?.hasInfestation) {
@@ -999,7 +1276,6 @@ export const Taniman: React.FC<TanimanProps> = ({
         }
         break;
       
-      // Code for the default case (planting seeds):
       default:
         if (selectedItem.type === 'crop' || selectedItem.type === 'tree') {
           if (!plot.isPlowed) {
@@ -1037,20 +1313,14 @@ export const Taniman: React.FC<TanimanProps> = ({
               ...plot,
               plant: newPlant
             };
-            
             return newPlots;
           });
-          
-          // Note: We don't start infestation check until the plant reaches stage 3
-          // This is handled in the growth timer effect
-          
           playTimedSound(require('@/assets/sound/plant.mp3'));
-          
-          // Only remove seed from inventory AFTER successful planting
           onUseItem(selectedItem);
         }
         break;
     }
+    setTimeout(() => savePlantsToFirebase(), 100);
   };
 
   const getPlantImage = (plant: PlantData) => {
@@ -1214,36 +1484,6 @@ export const Taniman: React.FC<TanimanProps> = ({
           </View>
         ))}
       </View>
-
-      {/* Debug infestation */}
-      {/* <TouchableOpacity 
-        onPress={() => testInfestation(0, 0)} 
-        className="bg-red-500 p-2 mt-2 rounded-lg"
-      >
-        <Text className="text-white font-bold">Force Infestation (Plot 0,0)</Text>
-      </TouchableOpacity> */}
-      
-      {/* Debug drought */}
-      {/* <TouchableOpacity 
-        onPress={() => testDrought(0, 0)} 
-        className="bg-yellow-500 p-2 mt-2 rounded-lg"
-      >
-        <Text className="text-white font-bold">Force Drought (Plot 0,0)</Text>
-      </TouchableOpacity> */}
-      
-      {/* Debug flood */}
-      {/* <TouchableOpacity 
-        onPress={() => testFlood(0, 0)} 
-        className="bg-blue-500 p-2 mt-2 rounded-lg"
-      >
-        <Text className="text-white font-bold">Force Flood (Plot 0,0)</Text>
-      </TouchableOpacity> */}
-
-      {/* infestation status for debugging */}
-      {/* <InfestationDebugOverlay plots={plots} /> */}
-
-      
-
       {selectedItem && (
         <View className="absolute top-[-5px] right-[300px] bg-white/80 p-2 rounded-lg">
           <Text className="text-sm font-medium">Selected: {selectedItem.title}</Text>

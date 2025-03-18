@@ -17,7 +17,6 @@ export const MissionsModal = ({
   missions: propMissions, 
   onMissionComplete 
 }: MissionsModalProps) => {
-  // Use propMissions directly instead of local state
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [answer, setAnswer] = useState<string>('');
 
@@ -28,7 +27,6 @@ export const MissionsModal = ({
     }
   }, [selectedMission]);
 
-  // Memoized mission progression logic
   const processedMissions = useMemo(() => {
     // Group missions by requiredMissionId
     const groupedMissions = propMissions.reduce((acc, mission) => {
@@ -88,7 +86,7 @@ export const MissionsModal = ({
     const [englishQuestion, tagalogQuestion] = fullQuestion.split(':');
     
     return (
-      <Modal visible={!!selectedMission} transparent animationType="slide">
+      <Modal visible={!!selectedMission} transparent animationType="fade">
         <View className="flex-1 justify-center items-center bg-black/50 p-4">
           <View className="bg-orange-300 p-6 rounded-lg w-full max-w-md">
             <View className="mb-4">
@@ -96,7 +94,7 @@ export const MissionsModal = ({
               <Text className="text-black-600 mb-2">{tagalogQuestion}</Text>
               <TextInput
                 className="border border-black-300 p-2 rounded-lg h-[50px]"
-                placeholder="Sagutan kung ano ang pag kakaintindi"
+                placeholder="Sagutan..."
                 multiline
                 value={answer}
                 onChangeText={setAnswer}

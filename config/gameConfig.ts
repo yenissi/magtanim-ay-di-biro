@@ -173,6 +173,14 @@ export const INITIAL_GAME_STATE = {
   };
   
   export const SHOP_ITEMS = [
+    // {
+    //   id: 0,
+    //   title: 'Itakv2',
+    //   type: 'tool',
+    //   description: 'Used for cutting plants or Harvesting',
+    //   image: require('@/assets/images/itak.png'),
+    //   price: 0,
+    // },
     {
       id: 1,
       title: "Asarol",

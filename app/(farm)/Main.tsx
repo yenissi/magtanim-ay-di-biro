@@ -13,7 +13,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { SimpleLineIcons } from '@expo/vector-icons';
 import { signOut } from 'firebase/auth';
-import { ref, update, increment, onValue } from 'firebase/database';
+import { ref, update, increment, onValue,get } from 'firebase/database';
 import { Firebase_Auth, Firebase_Database } from '@/firebaseConfig';
 import { useGameData } from '@/hooks/useGameData';
 import { ShopModal } from '../../components/(buttons)/ShopModal';
@@ -53,6 +53,7 @@ type PlotStatus = {
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [rottedItems, setRottedItems] = useState<InventoryItem[]>([]);
+  const [normalItems, setNormalItems] = useState<InventoryItem[]>([]);
   const [money, setMoney] = useState(1000);
   const [plotsState, setPlotsState] = useState<any>(null);
   const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions);
@@ -101,6 +102,28 @@ type PlotStatus = {
     loadDecomposedItems();
   }, []);
 
+  // Add this anywhere in your Main component with the other function definitions
+  const verifyInventoryInDatabase = async () => {
+    if (!params.uid) return;
+    
+    try {
+      const snapshot = await get(ref(Firebase_Database, `users/${params.uid}/inventory`));
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        console.log('Current inventory in database:', {
+          type: typeof data,
+          isArray: Array.isArray(data),
+          length: Object.keys(data).length,
+          items: Object.values(data).map(item => `${item.id}: ${item.title}`)
+        });
+      } else {
+        console.log('No inventory found in database');
+      }
+    } catch (error) {
+      console.error('Error verifying inventory:', error);
+    }
+  };
+
   // Create a function to save decomposed items
   const saveDecomposedItems = async (items: InventoryItem[]) => {
     try {
@@ -109,6 +132,14 @@ type PlotStatus = {
     } catch (error) {
       console.error('Failed to save decomposed items:', error);
     }
+  };
+
+  const onAddToDecompose = (item: InventoryItem) => {
+    setRottedItems(prevItems => [...prevItems, item]);
+  };
+
+  const onAddToNormalInventory = (item: InventoryItem) => {
+    setNormalItems(prevItems => [...prevItems, item]);
   };
 
   const handleAddToDecompose = (item: InventoryItem) => {
@@ -126,15 +157,38 @@ type PlotStatus = {
 
   useEffect(() => {
     if (!params.uid) return;
+    
     const userRef = ref(Firebase_Database, `users/${params.uid}`);
     const unsubscribe = onValue(userRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.val();
-        setInventory(data.inventory || []);
+        
+        // Handle inventory specifically
+        if (data.inventory) {
+          // If inventory is an object, convert it to an array
+          let inventoryArray = Array.isArray(data.inventory) 
+            ? data.inventory 
+            : Object.values(data.inventory);
+          
+          // Remove any null values
+          inventoryArray = inventoryArray.filter(item => item !== null);
+          
+          console.log('Inventory updated from Firebase:', {
+            length: inventoryArray.length,
+            items: inventoryArray.map(item => item?.title || 'unknown')
+          });
+          
+          setInventory(inventoryArray);
+        } else {
+          // If there's no inventory in the data, set it to an empty array
+          setInventory([]);
+        }
+        
         setUserMoney(data.money || 0);
-        setPlots(data.plotsState || plots); // Ensure default format
+        setPlots(data.plotsState || plots);
       }
     });
+    
     return () => unsubscribe();
   }, [params.uid]);
 
@@ -213,35 +267,38 @@ type PlotStatus = {
       Alert.alert("Error", "User ID is missing");
       return;
     }
-
+  
     try {
       console.log(`Adding item to inventory:`, {
         item: JSON.stringify(item, null, 2),
-        currentInventoryLength: inventory?.length,
-        currentInventory: JSON.stringify(inventory, null, 2)
+        currentInventoryLength: inventory?.length || 0
       });
+  
+      // Create a copy of the current inventory array or initialize if it doesn't exist
+      const currentInventory = Array.isArray(inventory) ? [...inventory] : [];
       
-      // Ensure we're working with a fresh, complete inventory
-      const currentInventory = inventory || [];
-      const newInventory = [...currentInventory, item];
-
-      console.log('New Inventory:', {
-        newInventoryLength: newInventory.length,
-        newInventory: JSON.stringify(newInventory, null, 2)
-      });
-
-      setInventory(newInventory);
-
-      // Log before Firebase update
-      console.log('About to update Firebase with new inventory:', newInventory);
+      // Check if an item with the same ID already exists
+      const existingItemIndex = currentInventory.findIndex(i => i.id === item.id);
       
+      // If item exists, update it, otherwise add it
+      if (existingItemIndex >= 0) {
+        currentInventory[existingItemIndex] = item;
+        console.log('Updated existing item in inventory:', item.id);
+      } else {
+        currentInventory.push(item);
+        console.log('Added new item to inventory:', item.id);
+      }
+  
+      // Update local state first to improve UI responsiveness
+      setInventory(currentInventory);
+  
       // Then update Firebase
       const userRef = ref(Firebase_Database, `users/${params.uid}`);
       await update(userRef, {
-        inventory: newInventory
+        inventory: currentInventory
       });
-      
-      Alert.alert("Inventory Update", `Added ${item.title} to inventory`);
+  
+      console.log('Firebase updated with new inventory:', currentInventory.length);
     } catch (error) {
       console.error('Error adding item to inventory:', error);
       Alert.alert("Error", "Failed to add item to inventory");
@@ -250,13 +307,12 @@ type PlotStatus = {
 
 
   const handleUseItem = (usedItem: InventoryItem) => { 
-      console.log('Using Item: ', usedItem);
+      console.log('Using Item: ', usedItem.title);
     
     // Remove the item from inventory
     const updatedInventory = inventory.filter(item => item.id !== usedItem.id);
     
-    // Update local state
-    setInventory(updatedInventory);
+    setInventory(current => current.filter(i => i.id !== usedItem.id));
     
     // Update Firebase
     if (params.uid) {
@@ -301,7 +357,7 @@ type PlotStatus = {
     }
     
     try {
-      console.log("Saving plots state to Firebase...");
+      // console.log("Saving plots state to Firebase...");
       
       // Create a deep copy of the plots array to avoid reference issues
       const plotsToSave = JSON.parse(JSON.stringify(plots));
@@ -337,7 +393,7 @@ type PlotStatus = {
         plotsState: sanitizedPlotsState,
       });
     
-      console.log("Plots state saved successfully!");
+      // console.log("Plots state saved successfully!");
       return true;
     } catch (error) {
       console.error("Error saving plots state:", error);
@@ -434,11 +490,10 @@ type PlotStatus = {
     
     return () => {
       ScreenOrientation.unlockAsync();
-      if (sound) {
-        sound.unloadAsync();
-      }
     };
-  }, [sound]);
+  }, []);
+
+    
 
   const playSound = async (soundFile: number) => {
     try {
@@ -531,10 +586,52 @@ type PlotStatus = {
   };
 
   const onUseItem = (usedItem: InventoryItem) => {
-    setInventory(currentInventory => 
-      currentInventory.filter(item => item.id !== usedItem.id)
-    );
-  };
+    console.log('Using Item: ', usedItem);
+
+  // Remove the item from inventory
+  const updatedInventory = inventory.filter(item => item.id !== usedItem.id);
+
+  // Update local state
+  setInventory(updatedInventory);
+
+  // Update Firebase
+  if (params.uid) {
+    const userRef = ref(Firebase_Database, `users/${params.uid}`);
+    update(userRef, {
+      inventory: updatedInventory
+    });
+  }
+};
+useEffect(() => {
+  if (params.uid) {
+    // Refresh inventory data from Firebase
+    const userRef = ref(Firebase_Database, `users/${params.uid}`);
+    get(userRef).then((snapshot) => {
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        if (data.inventory) {
+          // Convert to array if needed
+          const inventoryArray = Array.isArray(data.inventory) 
+            ? data.inventory 
+            : Object.values(data.inventory);
+          
+          // Filter out null values
+          const filteredInventory = inventoryArray.filter(item => item !== null);
+          
+          setInventory(filteredInventory);
+          console.log('Inventory refreshed from Firebase:', filteredInventory.length);
+        }
+      }
+    }).catch((error) => {
+      console.error('Error refreshing inventory:', error);
+    });
+  }
+}, [selectedItem]);
+
+  const handleSelectItem = (item: InventoryItem | null) => {
+    console.log("Selected item in parent:", item);
+    setSelectedItem(item);
+};
 
   if (loading) {
     return (
@@ -657,11 +754,16 @@ type PlotStatus = {
           visible={decomposeVisible}
           onClose={() => setDecomposeVisible(false)}
           rottedItems={rottedItems}
+          normalItems={normalItems}
+          inventory={inventory || []}
           onRemoveItem={handleRemoveRottedItem}
           onUpdateMoney={handleUpdateMoney}
           onAddToInventory={handleAddToInventory}
           decomposedItems={decomposedItems}
           onLoadRottedItems={handleLoadRottedItems}
+          onLoadNormalItems={setNormalItems}
+          onLoadInventory={(items) => setInventory(items)}
+          verifyInventory={verifyInventoryInDatabase}
           // onUpdateStatistics={handleUpdateStatistics}
         />
 
@@ -669,11 +771,12 @@ type PlotStatus = {
           visible={bagVisible}
           onClose={() => setBagVisible(false)}
           inventory={inventory || []} 
-          onSelectItem={setSelectedItem}
+          onSelectItem={handleSelectItem}
           selectedItem={selectedItem}
           onSellItem={handleSellItem}
+          onAddToInventory={handleAddToInventory}
           onUseItem={onUseItem}
-          plots={plots || []}
+          plots={plots}
           onRemoveItem={handleRemoveItem}
         />
 
@@ -699,7 +802,7 @@ type PlotStatus = {
         />
 
         <Taniman
-          inventory={inventory}
+          inventory={inventory || []}
           onUpdateMoney={handleUpdateMoney}
           onUpdateStatistics={handleUpdateStatistics}
           selectedItem={selectedItem}
@@ -710,6 +813,7 @@ type PlotStatus = {
           onUseItem={handleUseItem}
           decomposedItems={decomposedItems}
           onAddToDecompose={handleAddToDecompose}
+          onAddToNormalInventory={onAddToNormalInventory}
         />
       </View>
     </ImageBackground>

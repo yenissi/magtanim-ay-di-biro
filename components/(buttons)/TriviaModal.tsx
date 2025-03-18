@@ -50,16 +50,16 @@ const TriviaModal = ({ visible, onClose }: TriviaModalProps ) => {
       console.error("Error playing sound:", error);
     }
   };
-  useEffect(() => {
-        const lockOrientation = async () => {
-          await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock. LANDSCAPE);
-        };
-        lockOrientation();
+  // useEffect(() => {
+  //       const lockOrientation = async () => {
+  //         await ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock. LANDSCAPE);
+  //       };
+  //       lockOrientation();
     
-        return () => {
-          ScreenOrientation.unlockAsync();
-        };
-      }, []);
+  //       return () => {
+  //         ScreenOrientation.unlockAsync();
+  //       };
+  //     }, []);
 
   return (
     <Modal visible={visible} transparent animationType="fade">

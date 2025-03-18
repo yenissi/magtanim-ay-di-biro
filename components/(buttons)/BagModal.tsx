@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, Image, Alert } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import type { InventoryItem } from '@/types';
@@ -19,46 +19,44 @@ interface BagModalProps {
   onUseItem: (item: InventoryItem) => void;
   onRemoveItem: (itemId: string) => void; 
   plots: PlotStatus[][];
+  onAddToInventory: (item: InventoryItem) => void;
 }
-
-const DEFAULT_ITAK: InventoryItem = {
-  id: 'default-itak',
-  title: 'Itak',
-  type: 'tool',
-  description: 'Used for cutting plants or Harvesting',
-  image: require('@/assets/images/itak.png'), // Update path as needed
-  price: 0,
-  sellPrice: 0
-};
 
 export const BagModal = ({ 
   visible, 
   onClose, 
-  inventory,
+  inventory = [],
   onSelectItem,
   selectedItem,
   onSellItem,
   onUseItem,
   onRemoveItem,
-  plots
+  plots,
+  onAddToInventory
 }: BagModalProps) => {
-  // console.log('BagModal - Current Inventory:', inventory);
-  // console.log('BagModal Render - Selected item:', selectedItem);
+  console.log('BagModal - Inventory length:', inventory?.length || 0);
 
-  // const handleItemSelect = (item: InventoryItem) => {
-  //   console.log('Item selected:', item.title);
-  //   onSelectItem(selectedItem?.id === item.id ? null : item);
-  // };
-
-  const hasItak = inventory.some(item => item.title === 'Itak');
-  const displayInventory = hasItak ? inventory : [...inventory, DEFAULT_ITAK];
+  // Ensure inventory is always an array, even if undefined or null
+  const safeInventory = Array.isArray(inventory) ? inventory : [];
+  
+  useEffect(() => {
+    if (Array.isArray(inventory) && inventory.length > 0) {
+      console.log('BagModal - Detailed Inventory:', inventory.map(item => ({
+        title: item.title,
+      })));
+    } else {
+    }
+  }, [inventory]);
 
   const handleItemUse = (item: InventoryItem) => {
-    onUseItem(item); // Remove item from inventory
+    onUseItem(item);
   };
+  useEffect(() => {
+    console.log('BagModal - Current inventory:', inventory);
+  }, [inventory]);
 
   const handleSellItem = (item: InventoryItem) => {
-    if (item.title === 'Itak') {
+    if (item.title === 'Itak' || item.title === '') {
       Alert.alert("Cannot Sell", "This essential tool cannot be sold.");
       return;
     }
@@ -86,14 +84,7 @@ export const BagModal = ({
   };
 
   const handleUseItem = (item: InventoryItem) => { 
-    console.log('Using Item: ', item);
-
-    if (item.title === 'Itak') {
-      onSelectItem(item);
-      onClose();
-      return;
-    }
-
+    console.log('Using Item BagModal: ', item);
     onSelectItem(item);
     onClose();
     
@@ -101,7 +92,7 @@ export const BagModal = ({
     const nonConsumableTools = [''];
     if (!nonConsumableTools.includes(item.title)) {
       // Determine what the item does first
-      if (item.title === 'Fertilizer') {
+      if (item.title === 'Fertilizer' || item.title === 'Organic Fertilizer') {
         // If there's no currently selected plot with a plant, alert the user
         const hasActivePlant = plots.some(row => 
           row.some(plot => plot.plant && !plot.plant.isFertilized)
@@ -125,8 +116,7 @@ export const BagModal = ({
         );
         
         if (!hasAvailablePlot) {
-          // Alert.alert("Plots Available", "You need a plowed and watered plot to plant seeds.");
-          return; // Don't remove the item if it can't be used
+          return;
         }
         
         Alert.alert(
@@ -137,25 +127,22 @@ export const BagModal = ({
           ]
         );
       }
-      
-      // REMOVED: Don't call onUseItem here - we only select the item, not use it
-      // onUseItem(item);
     }
   };
 
   const renderItemActions = (item: InventoryItem) => {
-      if (item.title === 'Itak') {
-        return (
-          <TouchableOpacity
-            className="rounded-lg p-2 w-full bg-green-400"
-            onPress={() => handleUseItem(item)}
-          >
-            <Text className="text-sm font-medium text-center text-white">
-              Use
-            </Text>
-          </TouchableOpacity>
-        );
-      }
+    if (item.title === '' || item.title === 'Itak') {
+      return (
+        <TouchableOpacity
+          className="rounded-lg p-2 w-full bg-green-400"
+          onPress={() => handleUseItem(item)}
+        >
+          <Text className="text-sm font-medium text-center text-white">
+            Use
+          </Text>
+        </TouchableOpacity>
+      );
+    }
     // Special handling for harvested crops
     if (item.type === 'harvestedCrop') {
       return (
@@ -169,7 +156,6 @@ export const BagModal = ({
         </TouchableOpacity>
       );
     }
-
 
     // For consumable items like seeds, fertilizer, etc.
     return (
@@ -196,30 +182,30 @@ export const BagModal = ({
           </View>
 
           <ScrollView horizontal className="max-h-96">
-            {displayInventory.length === 0 ? (
+            {safeInventory.length === 0 ? (
               <Text className="text-center text-gray-600 p-4">Your bag is empty</Text>
             ) : (
               <View className="flex-row flex-wrap gap-4">
-                {displayInventory.map((item, index) => (
+                {safeInventory.map((item, index) => (
                   <View 
-                    key={`${item.id}-${index}`} 
+                    key={`${item?.id || 'unknown'}-${index}`} 
                     className={`rounded-lg p-3 w-40 ${
-                      selectedItem?.id === item.id 
+                      selectedItem?.id === item?.id 
                         ? 'bg-yellow-300 border-2 border-amber-500' 
                         : 'bg-yellow-200'
                     }`}
                   >
                     <View className="items-center mb-2">
                       <Image 
-                        source={item.image} 
+                        source={item?.image} 
                         className="w-16 h-16"
                         resizeMode="contain"
                       />
                     </View>
-                    <Text className="font-bold mb-1 text-center">{item.title}</Text>
-                    <Text className="text-xs text-gray-600 mb-2 text-center">{item.type}</Text>
+                    <Text className="font-bold mb-1 text-center">{item?.title || 'Unknown Item'}</Text>
+                    <Text className="text-xs text-gray-600 mb-2 text-center">{item?.type || ''}</Text>
                     <View className="flex-row items-center gap-1">
-                      {renderItemActions(item)}
+                      {item && renderItemActions(item)}
                     </View>
                   </View>
                 ))}

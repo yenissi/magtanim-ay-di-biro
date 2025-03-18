@@ -141,42 +141,45 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
 
   const [selectedTab, setSelectedTab] = useState('All');
 
-  const filteredShopItems = SHOP_ITEMS.filter(item => item.title !== '' && item.title !== 'Itak');
-
   const displayItems = selectedTab === 'All' 
-    ? filteredShopItems 
-    : filteredShopItems.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
+  ? SHOP_ITEMS 
+  : SHOP_ITEMS.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
 
-  const handlePurchase = async (itemId: number, price: number) => {
-    if (userMoney < price) {
-      Alert.alert("Insufficient Funds", "You don't have enough money for this purchase.");
-      return;
-    }
-    const db = getDatabase();
-    const userRef = ref(db, `users/${uid}`);
-    try {
-      const snapshot = await get(userRef);
-      if (!snapshot.exists()) return;
-
-      const userData = snapshot.val();
-      const inventory = userData.inventory || [];
-
-      const item = SHOP_ITEMS.find(item => item.id === itemId);
-      if (!item) {
-        console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
+    const handlePurchase = async (itemId: number, price: number) => {
+      if (userMoney < price) {
+        Alert.alert("Insufficient Funds", "You don't have enough money for this purchase.");
         return;
       }
 
-      await update(userRef, {
-        money: userData.money - price,
-        inventory: [...inventory, SHOP_ITEMS.find(item => item.id === itemId)],
-      });
-      Alert.alert("Success", "Item purchased successfully!");
-      onPurchase();
-    } catch (error) {
-      Alert.alert("Error", "Failed to complete purchase. Please try again.");
-    }
-  };
+      const db = getDatabase();
+      const userRef = ref(db, `users/${uid}`);
+      
+      try {
+        const snapshot = await get(userRef);
+        if (!snapshot.exists()) return;
+    
+        const userData = snapshot.val();
+        const inventory = Array.isArray(userData.inventory) ? userData.inventory : [];
+        
+        // Find the item to purchase
+        const item = SHOP_ITEMS.find(item => item.id === itemId);
+        if (!item) {
+          console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
+          return;
+        }
+    
+        await update(userRef, {
+          money: userData.money - price,
+          inventory: [...inventory, SHOP_ITEMS.find(item => item.id === itemId)],
+        });
+        
+        Alert.alert("Success", `${item.title} purchased successfully!`);
+        onPurchase();
+      } catch (error) {
+        console.error("Purchase error:", error);
+        Alert.alert("Error", "Failed to complete purchase. Please try again.");
+      }
+    };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
