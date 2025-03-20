@@ -5,8 +5,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 1,
         title: "Mag Dilig ng 2 Crop",
-        description: "",
-        questions: "Tagalog: Bakit mahalaga ang wastong pagdidilig ng halaman?",
+        questions: {
+          tagalog: "Bakit mahalaga ang wastong pagdidilig ng halaman?",
+          english: "Why is it important to water plants properly?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -15,8 +17,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 2,
         title: "Mag Dilig ng 3 Crop",
-        description: "",
-        questions: "Tagalog: Anong mga hakbang ang dapat gawin kung ang lupa sa inyong hardin ay tuyo, matigas, at bitak-bitak?",
+        questions: {
+          tagalog: "Anong mga hakbang ang dapat gawin kung ang lupa sa inyong hardin ay tuyo, matigas, at bitak-bitak?",
+          english: "What steps should you take if the soil in your garden is dry, hard, and cracked?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -25,8 +29,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 3,
         title: "Mag Dilig ng 4 Crop",
-        description: "",
-        questions: "Tagalog: Paano mo masisiguro na natatanggap ng mga halaman ang sapat na sikat ng araw at tubig?",
+        questions: {
+          tagalog: "Paano mo masisiguro na natatanggap ng mga halaman ang sapat na sikat ng araw at tubig?",
+          english: "How do you ensure that the plants receive adequate sunlight and water?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -35,8 +41,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 4,
         title: "Mag tanim ng 2 Ornamental Plant",
-        description: "",
-        questions: "Tagalog: Ano ang mga pakinabang ng pagtatanim ng mga halamang ornamental sa inyong hardin o pamayanan?",
+        questions: {
+          tagalog: "Ano ang mga pakinabang ng pagtatanim ng mga halamang ornamental sa inyong hardin o pamayanan?",
+          english: "What are the benefits of planting ornamental plants in your garden or community?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -45,8 +53,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 5,
         title: "Mag tanim ng 3 Ornamental Plant",
-        description: "",
-        questions: "Tagalog: Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpigil ng pagguho ng lupa, pagbaha at pagpapanatili ng kalidad ng tubig?",
+        questions: {
+          tagalog: "Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpigil ng pagguho ng lupa, pagbaha at pagpapanatili ng kalidad ng tubig?",
+          english: "How do ornamental plants and trees help in preventing soil erosion, flooding, and maintaining water quality?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -55,8 +65,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 6,
         title: "Mag tanim ng 4 Ornamental Plant",
-        description: "",
-        questions: "Tagalog: Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpapababa ng polusyon sa hangin?",
+        questions: {
+          tagalog: "Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpapababa ng polusyon sa hangin?",
+          english: "How do ornamental plants and trees contribute to reducing air pollution?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -65,8 +77,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 7,
         title: "Mag tanim ng 5 Ornamental Plant",
-        description: "",
-        questions: "Tagalog: Paano pinapaganda ng mga halamang ornamental ang isang lugar?",
+        questions:{
+          tagalog: "Paano pinapaganda ng mga halamang ornamental ang isang lugar?",
+          english: "How do ornamental plants enhance the aesthetic value of a place?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -75,8 +89,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 8,
         title: "Mag tanim ng kahit anong Ornamental Plant",
-        description: "",
-        questions: "Tagalog: Bakit mahalagang pumili ng tamang halamang ornamental para sa inyong hardin?",
+        questions:{
+          tagalog: "Bakit mahalagang pumili ng tamang halamang ornamental para sa inyong hardin?",
+          english: "Why is it important to choose the right ornamental plants for your garden?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -84,9 +100,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 9,
-        title: "Gumamit ng Tools",
-        description: "",
-        questions: "Tagalog: Ano ang mga karaniwang kasangkapan sa paghahalaman at ano ang kanilang gamit?",
+        title: "Gumamit ng Asarol",
+        questions:{
+          tagalog: "Ano ang mga karaniwang kasangkapan sa paghahalaman at ano ang kanilang gamit?",
+          english: "What are the common tools used in gardening, and what are their purposes?" ,
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -94,9 +112,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 10,
-        title: "Gumamait ng Fertilizer",
-        description: "",
-        questions: "Tagalog: Ano ang mga benepisyo ng paggamit ng organikong abono kumpara sa sintetikong pataba?",
+        title: "Gumamit ng Synthetic Fertilizer",
+        questions:{
+          tagalog: "Ano ang mga benepisyo ng paggamit ng organikong abono kumpara sa sintetikong pataba?",
+          english: " What are the benefits of using organic fertilizer compared to synthetic fertilizers? ",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -104,9 +124,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 11,
-        title: "Mag Decompose",
-        description: "",
-        questions: "Tagalog: Bakit mahalaga ang pagpili ng angkop na lokasyon para sa compost pit?",
+        title: "Gumawa ng Organic Fertilizer",
+        questions:{
+          tagalog: "Bakit mahalaga ang pagpili ng angkop na lokasyon para sa compost pit?",
+          english: "Why is it essential to choose an appropriate location for a compost pit?",
+        },        
         reward: 50,
         locked: false,
         completed: false,
@@ -114,9 +136,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 12,
-        title: "Mag Decompose",
-        description: "",
-        questions: "Tagalog: Ano ang mga benepisyo at kahinaan ng paggamit ng organic na pataba sa gardening?",
+        title: "Gumamit ng Organic Fertilizer",
+        questions:{
+          tagalog: "Ano ang mga benepisyo at kahinaan ng paggamit ng organic na pataba sa gardening?",
+          english: "What are the advantages and disadvantages of using organic fertilizers in gardening?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -125,8 +149,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 13,
         title: "Mag tanim ng tree",
-        description: "",
-        questions: "Tagalog: Bakit mahalaga ang mga puno sa kapaligiran at sa buhay ng tao?",
+        questions:{
+          tagalog: "Bakit mahalaga ang mga puno sa kapaligiran at sa buhay ng tao?",
+          english: "Why are trees important for the environment and human life?" ,
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -134,9 +160,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 14,
-        title: "Mag tanim ng 2 prutas",
-        description: "",
-        questions: "Tagalog: Bakit mahalaga ang magkaroon ng regular na suplay ng prutas sa merkado?",
+        title: "Mag Benta ng Fresh Plants",
+        questions:{
+          tagalog: "Bakit mahalaga ang magkaroon ng regular na suplay ng prutas sa merkado?",
+          English: "Why is it important to maintain a consistent supply of fruit in the market?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -144,9 +172,11 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 15,
-        title: "Mag tanim ng 5 prutas",
-        description: "",
-        questions: "Tagalog: Paano nakatutulong ang mga puno ng prutas sa suplay ng pagkain ng komunidad?",
+        title: "Mag tanim ng 2 crops",
+        questions: {
+          tagalog: "Paano nakatutulong ang mga prutas sa suplay ng pagkain ng komunidad?",
+          english: "How do fruit-bearing trees contribute to the communitys food supply?",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -155,8 +185,10 @@ export const INITIAL_GAME_STATE = {
       {
         id: 16,
         title: "Mag sell ng prutas",
-        description: "",
-        questions: "Tagalog: Paano maaaring pagkakitaan ng mga pamilya ang mga halamang ornamental?",
+        questions: {
+          tagalog: "Paano maaaring pagkakitaan ng mga pamilya ang mga halamang ornamental?",
+          english: "How can ornamental plants be used as a source of income for families",
+        },
         reward: 50,
         locked: false,
         completed: false,
@@ -168,7 +200,6 @@ export const INITIAL_GAME_STATE = {
       plantsGrown: 0,
       moneyEarned: 0,
       missionsCompleted: 0,
-      decomposeCrops:[],
     },
   };
   

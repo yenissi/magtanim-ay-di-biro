@@ -172,63 +172,73 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
   };
 
   // Handle selling normal crops
-  const handleSellNormalCrops = async () => {
-    if (selectedNormalItems.length === 0) {
-      Alert.alert('Selection Empty', 'Please select items to sell.');
-      return;
+const handleSellNormalCrops = async () => {
+  if (selectedNormalItems.length === 0) {
+    Alert.alert('Selection Empty', 'Please select items to sell.');
+    return;
+  }
+  
+  try {
+    const userId = Firebase_Auth.currentUser?.uid;
+    
+    // Calculate total sell value
+    const totalSellValue = selectedNormalItems.reduce((total, itemId) => {
+      const item = normalItems.find((item) => item.id === itemId);
+      return total + (item ? item.sellPrice : 0);
+    }, 0);
+    
+    if (userId) {
+      // Remove items from Firebase only - let listeners handle local state
+      const updates = {};
+      selectedNormalItems.forEach((itemId) => {
+        updates[`users/${userId}/normalItems/${itemId}`] = null;
+      });
+      await update(ref(Firebase_Database), updates);
+      
+      // Update statistics in Firebase
+      const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
+      const statsSnapshot = await get(userStatsRef);
+      const currentStats = statsSnapshot.val() || { 
+        rottedHarvested: 0,
+        normalHarvested: 0,
+        itemsSold: 0,
+        moneyEarned: 0 // Make sure this exists
+      };
+      
+      const updatedStats = {
+        ...currentStats,
+        itemsSold: (currentStats.itemsSold || 0) + selectedNormalItems.length,
+        moneyEarned: (currentStats.moneyEarned || 0) + totalSellValue // Add money earned to statistics
+      };
+      
+      await update(userStatsRef, updatedStats);
+      
+      // Update money in Firebase
+      const userMoneyRef = ref(Firebase_Database, `users/${userId}/money`);
+      await get(userMoneyRef).then((snapshot) => {
+        const currentMoney = snapshot.exists() ? snapshot.val() : 0;
+        set(userMoneyRef, currentMoney + totalSellValue);
+      });
+      
+      // Don't call onRemoveItem here - let Firebase listeners handle it
+    } else {
+      // If no user, update local state directly
+      onUpdateMoney(totalSellValue);
+      selectedNormalItems.forEach(onRemoveItem);
     }
     
-    try {
-      const userId = Firebase_Auth.currentUser?.uid;
-      
-      // Calculate total sell value
-      const totalSellValue = selectedNormalItems.reduce((total, itemId) => {
-        const item = normalItems.find((item) => item.id === itemId);
-        return total + (item ? item.sellPrice : 0);
-      }, 0);
-      
-      if (userId) {
-        // Remove items from Firebase only - let listeners handle local state
-        const updates = {};
-        selectedNormalItems.forEach((itemId) => {
-          updates[`users/${userId}/normalItems/${itemId}`] = null;
-        });
-        await update(ref(Firebase_Database), updates);
-        
-        // Update statistics in Firebase
-        const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
-        const updatedStats = {
-          ...statistics,
-          itemsSold: (statistics.itemsSold || 0) + selectedNormalItems.length
-        };
-        await update(userStatsRef, updatedStats);
-        
-        // Update money in Firebase
-        const userMoneyRef = ref(Firebase_Database, `users/${userId}/money`);
-        await get(userMoneyRef).then((snapshot) => {
-          const currentMoney = snapshot.exists() ? snapshot.val() : 0;
-          set(userMoneyRef, currentMoney + totalSellValue);
-        });
-        
-        // Don't call onRemoveItem here - let Firebase listeners handle it
-      } else {
-        // If no user, update local state directly
-        onUpdateMoney(totalSellValue);
-        selectedNormalItems.forEach(onRemoveItem);
-      }
-      
-      // Reset selection regardless of auth state
-      setSelectedNormalItems([]);
-      
-      Alert.alert(
-        'Sale Complete!',
-        `Sold ${selectedNormalItems.length} items for ${totalSellValue} coins.`
-      );
-    } catch (error) {
-      console.error('Error selling items:', error);
-      Alert.alert('Error', 'Failed to sell items. Please try again.');
-    }
-  };
+    // Reset selection regardless of auth state
+    setSelectedNormalItems([]);
+    
+    Alert.alert(
+      'Sale Complete!',
+      `Sold ${selectedNormalItems.length} items for ${totalSellValue} coins.`
+    );
+  } catch (error) {
+    console.error('Error selling items:', error);
+    Alert.alert('Error', 'Failed to sell items. Please try again.');
+  }
+};
 
   // Handle decomposing rotted crops into fertilizer
   const handleDecompose = async () => {
@@ -416,11 +426,11 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
                 <Text className="font-semibold text-brown-800">
                   Rotted Items ({rottedItems.length})
                 </Text>
-                <TouchableOpacity onPress={handleSelectAllRotted} className="bg-brown-500 px-3 py-1 rounded">
+                {/* <TouchableOpacity onPress={handleSelectAllRotted} className="bg-brown-500 px-3 py-1 rounded">
                   <Text className="text-white text-xs">
                     {selectedRottedItems.length === rottedItems.length ? 'Deselect All' : 'Select All'}
                   </Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
 
               {rottedItems.length > 0 ? (
@@ -478,11 +488,11 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
                 <Text className="font-semibold text-brown-800">
                   Fresh Crops ({normalItems.length})
                 </Text>
-                <TouchableOpacity onPress={handleSelectAllNormal} className="bg-brown-500 px-3 py-1 rounded">
+                {/* <TouchableOpacity onPress={handleSelectAllNormal} className="bg-brown-500 px-3 py-1 rounded">
                   <Text className="text-white text-xs">
                     {selectedNormalItems.length === normalItems.length ? 'Deselect All' : 'Select All'}
                   </Text>
-                </TouchableOpacity>
+                </TouchableOpacity> */}
               </View>
 
               {normalItems.length > 0 ? (

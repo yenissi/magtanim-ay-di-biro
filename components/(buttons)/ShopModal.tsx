@@ -167,10 +167,30 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
           console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
           return;
         }
+
+        const existingItemIndex = inventory.findIndex(item => item.id === itemId);
+    
+        let updatedInventory;
+        if (existingItemIndex !== -1) {
+          // Item exists, increment quantity
+          updatedInventory = [...inventory];
+          if (!updatedInventory[existingItemIndex].quantity) {
+            // If quantity property doesn't exist yet, initialize it to 1
+            updatedInventory[existingItemIndex] = {
+              ...updatedInventory[existingItemIndex],
+              quantity: 1
+            };
+          }
+          updatedInventory[existingItemIndex].quantity += 1;
+        } else {
+          // Item doesn't exist, add it with quantity 1
+          updatedInventory = [...inventory, {...item, quantity: 1}];
+        }
+
     
         await update(userRef, {
           money: userData.money - price,
-          inventory: [...inventory, SHOP_ITEMS.find(item => item.id === itemId)],
+          inventory: updatedInventory,
         });
         
         Alert.alert("Success", `${item.title} purchased successfully!`);

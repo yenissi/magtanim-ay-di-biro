@@ -29,6 +29,7 @@ export interface InventoryItem {
   sellPrice?: number;
   type: 'crop' | 'tree' | 'tool' | 'harvestedCrop' | 'fertilizer' | 'pesticide';
   image: number;
+  quantity?: number;
 }
 
 export interface GameStatistics {

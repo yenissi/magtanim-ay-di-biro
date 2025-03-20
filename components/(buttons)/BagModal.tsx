@@ -34,14 +34,13 @@ export const BagModal = ({
   plots,
   onAddToInventory
 }: BagModalProps) => {
-  console.log('BagModal - Inventory length:', inventory?.length || 0);
 
   // Ensure inventory is always an array, even if undefined or null
   const safeInventory = Array.isArray(inventory) ? inventory : [];
   
   useEffect(() => {
     if (Array.isArray(inventory) && inventory.length > 0) {
-      console.log('BagModal - Detailed Inventory:', inventory.map(item => ({
+      console.log('', inventory.map(item => ({
         title: item.title,
       })));
     } else {
@@ -60,9 +59,13 @@ export const BagModal = ({
       Alert.alert("Cannot Sell", "This essential tool cannot be sold.");
       return;
     }
+    
+    const sellQuantity = item.quantity && item.quantity > 1 ? 1 : 1;
+    const totalPrice = (item.sellPrice || 0) * sellQuantity;
+    
     Alert.alert(
       "Sell Item",
-      `Are you sure you want to sell ${item.title} for ${item.sellPrice} coins?`,
+      `Are you sure you want to sell ${sellQuantity} ${item.title} for ${totalPrice} coins?`,
       [
         {
           text: "Cancel",
@@ -185,16 +188,16 @@ export const BagModal = ({
             {safeInventory.length === 0 ? (
               <Text className="text-center text-gray-600 p-4">Your bag is empty</Text>
             ) : (
-              <View className="flex-row flex-wrap gap-4">
-                {safeInventory.map((item, index) => (
-                  <View 
-                    key={`${item?.id || 'unknown'}-${index}`} 
-                    className={`rounded-lg p-3 w-40 ${
-                      selectedItem?.id === item?.id 
-                        ? 'bg-yellow-300 border-2 border-amber-500' 
-                        : 'bg-yellow-200'
-                    }`}
-                  >
+                <View className="flex-row flex-wrap gap-4">
+                  {safeInventory.map((item, index) => (
+                    <View 
+                      key={`${item?.id || 'unknown'}-${index}`} 
+                      className={`rounded-lg p-3 w-40 ${
+                        selectedItem?.id === item?.id 
+                          ? 'bg-yellow-300 border-2 border-amber-500' 
+                          : 'bg-yellow-200'
+                      }`}
+                    >
                     <View className="items-center mb-2">
                       <Image 
                         source={item?.image} 
@@ -203,7 +206,10 @@ export const BagModal = ({
                       />
                     </View>
                     <Text className="font-bold mb-1 text-center">{item?.title || 'Unknown Item'}</Text>
-                    <Text className="text-xs text-gray-600 mb-2 text-center">{item?.type || ''}</Text>
+                    {item?.quantity && item.quantity > 1 && (
+                      <Text className="font-bold mb-1 text-center text-gray-700">Qty: {item.quantity}</Text>
+                    )}
+                    {/* <Text className="text-xs text-gray-600 mb-2 text-center">{item?.type || ''}</Text> */}
                     <View className="flex-row items-center gap-1">
                       {item && renderItemActions(item)}
                     </View>

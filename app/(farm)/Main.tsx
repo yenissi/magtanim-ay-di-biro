@@ -56,7 +56,7 @@ type PlotStatus = {
   const [normalItems, setNormalItems] = useState<InventoryItem[]>([]);
   const [money, setMoney] = useState(1000);
   const [plotsState, setPlotsState] = useState<any>(null);
-  const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions);
+  const [missions, setMissions] = useState<Mission[]>([]);  
   const [rottedCrops, setRottedCrops] = useState<InventoryItem[]>([]);
   const [composeModalVisible, setComposeModalVisible] = useState(false);
   const [decomposedItems, setDecomposedItems] = useState<InventoryItem[]>([]);
@@ -85,6 +85,57 @@ type PlotStatus = {
     profile: false,
     trivia: false,
   });
+
+  useEffect(() => {
+    if (!params.uid) return;
+    
+    const loadMissions = async () => {
+      try {
+        // First try to load missions from user data
+        const userMissionsRef = ref(Firebase_Database, `users/${params.uid}/missions`);
+        const snapshot = await get(userMissionsRef);
+        
+        if (snapshot.exists()) {
+          // Use saved missions from Firebase
+          const savedMissions = snapshot.val();
+          if (Array.isArray(savedMissions)) {
+            setMissions(savedMissions);
+          } else {
+            // If saved as object, convert to array
+            setMissions(Object.values(savedMissions));
+          }
+          console.log("Loaded missions from Firebase:", savedMissions);
+        } else {
+          // If no saved missions found, get completed missions to mark them in the initial state
+          const completedMissionsRef = ref(Firebase_Database, `users/${params.uid}/missionsCompleted`);
+          const completedSnapshot = await get(completedMissionsRef);
+          
+          if (completedSnapshot.exists()) {
+            const completedMissions = completedSnapshot.val();
+            // Mark completed missions in the initial state
+            const initialMissionsWithCompletion = INITIAL_GAME_STATE.missions.map(mission => ({
+              ...mission,
+              completed: !!completedMissions[mission.id]
+            }));
+            setMissions(initialMissionsWithCompletion);
+            
+            // Also save this to the missions node for future reference
+            await update(userMissionsRef, initialMissionsWithCompletion);
+          } else {
+            // If no completed missions either, use initial state
+            setMissions(INITIAL_GAME_STATE.missions);
+            // Save initial missions to Firebase
+            await update(userMissionsRef, INITIAL_GAME_STATE.missions);
+          }
+        }
+      } catch (error) {
+        console.error("Error loading missions:", error);
+        setMissions(INITIAL_GAME_STATE.missions);
+      }
+    };
+    
+    loadMissions();
+  }, [params.uid]);
 
   useEffect(() => {
     const loadDecomposedItems = async () => {
@@ -307,21 +358,35 @@ type PlotStatus = {
 
 
   const handleUseItem = (usedItem: InventoryItem) => { 
-      console.log('Using Item: ', usedItem.title);
+    console.log('Using Item: ', usedItem.title);
     
-    // Remove the item from inventory
-    const updatedInventory = inventory.filter(item => item.id !== usedItem.id);
+    // Create a copy of the current inventory
+    const updatedInventory = [...inventory];
     
-    setInventory(current => current.filter(i => i.id !== usedItem.id));
+    // Find the item in the inventory
+    const itemIndex = updatedInventory.findIndex(item => item.id === usedItem.id);
     
-    // Update Firebase
-    if (params.uid) {
-      const userRef = ref(Firebase_Database, `users/${params.uid}`);
-      update(userRef, {
-        inventory: updatedInventory
-      });
+    if (itemIndex !== -1) {
+      // If quantity property exists and is greater than 1, decrement it
+      if (updatedInventory[itemIndex].quantity && updatedInventory[itemIndex].quantity > 1) {
+        updatedInventory[itemIndex].quantity -= 1;
+      } else {
+        // Otherwise, remove the item
+        updatedInventory.splice(itemIndex, 1);
+      }
+      
+      // Update state and Firebase
+      setInventory(updatedInventory);
+      
+      if (params.uid) {
+        const userRef = ref(Firebase_Database, `users/${params.uid}`);
+        update(userRef, {
+          inventory: updatedInventory
+        });
+      }
     }
   };
+  
 
   const handleUpdateInventory = async (newInventory: InventoryItem[]) => {
     setInventory(newInventory);
@@ -539,29 +604,36 @@ type PlotStatus = {
     }
   };
 
-  const handleMissionComplete = (missionId: number, answers: string[]) => {
-    const updatedMissions = missions.map(mission => 
-      mission.id === missionId 
-        ? { ...mission, completed: true } 
-        : mission
-    );
-    setMissions(updatedMissions);
-    
-    // Optional: Save mission progress to Firebase
-    if (params.uid) {
-      try {
-        update(ref(Firebase_Database, `users/${params.uid}`), {
-          missions: updatedMissions
-        });
-      } catch (error) {
-        console.error('Error saving mission progress:', error);
-      }
+  const handleMissionComplete = async (missionId: number, answer: string) => {
+    if (!params.uid) {
+      console.error("Cannot complete mission: User ID is missing");
+      return;
     }
-
-    // Optional: Add mission reward to money
-    const completedMission = updatedMissions.find(m => m.id === missionId);
-    if (completedMission) {
-      handleUpdateMoney(completedMission.reward);
+    
+    try {
+      // Update local state
+      const updatedMissions = missions.map(mission => 
+        mission.id === missionId 
+          ? { ...mission, completed: true } 
+          : mission
+      );
+      setMissions(updatedMissions);
+      
+      // Find the completed mission to get the reward
+      const completedMission = missions.find(m => m.id === missionId);
+      if (completedMission) {
+        // Add mission reward to money
+        await handleUpdateMoney(completedMission.reward);
+        
+        // Update statistics if needed
+        await handleUpdateStatistics({ 
+          moneyEarned: completedMission.reward
+        });
+        
+        console.log(`Mission ${missionId} completed. Reward: ₱${completedMission.reward}.00`);
+      }
+    } catch (error) {
+      console.error("Error in handleMissionComplete:", error);
     }
   };
 
@@ -785,6 +857,7 @@ useEffect(() => {
           onClose={() => setMissionsVisible(false)}
           missions={missions}
           onMissionComplete={handleMissionComplete}
+          userId={params.uid as string}
         />
 
         <ProfileModal
