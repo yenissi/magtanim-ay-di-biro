@@ -36,6 +36,10 @@ type PlotStatus = {
   plant?: any;
 };
 
+interface MissionProgress {
+  action: string;
+  details: any;
+}
  const Main = () => {
   const params = useLocalSearchParams();
   const [userData, setUserData] = useState<any>(null);
@@ -56,7 +60,7 @@ type PlotStatus = {
   const [normalItems, setNormalItems] = useState<InventoryItem[]>([]);
   const [money, setMoney] = useState(1000);
   const [plotsState, setPlotsState] = useState<any>(null);
-  const [missions, setMissions] = useState<Mission[]>([]);  
+  const [missions, setMissions] = useState<Mission[]>(INITIAL_GAME_STATE.missions); 
   const [rottedCrops, setRottedCrops] = useState<InventoryItem[]>([]);
   const [composeModalVisible, setComposeModalVisible] = useState(false);
   const [decomposedItems, setDecomposedItems] = useState<InventoryItem[]>([]);
@@ -65,6 +69,20 @@ type PlotStatus = {
     plantsGrown: 0,
     moneyEarned: 0,
     compostCreated: 0
+  });
+
+  const [missionProgress, setMissionProgress] = useState<{
+    wateredCrops: number;
+    plantedCrops: number;
+    harvestedCrops: number;
+    usedTools: { [key: string]: number };
+    usedFertilizers: { [key: string]: number };
+  }>({
+    wateredCrops: 0,
+    plantedCrops: 0,
+    harvestedCrops: 0,
+    usedTools: {},
+    usedFertilizers: {},
   });
 
   
@@ -88,54 +106,93 @@ type PlotStatus = {
 
   useEffect(() => {
     if (!params.uid) return;
-    
     const loadMissions = async () => {
       try {
-        // First try to load missions from user data
-        const userMissionsRef = ref(Firebase_Database, `users/${params.uid}/missions`);
-        const snapshot = await get(userMissionsRef);
-        
+        const missionsRef = ref(Firebase_Database, `users/${params.uid}/missions`);
+        const snapshot = await get(missionsRef);
         if (snapshot.exists()) {
-          // Use saved missions from Firebase
-          const savedMissions = snapshot.val();
-          if (Array.isArray(savedMissions)) {
-            setMissions(savedMissions);
-          } else {
-            // If saved as object, convert to array
-            setMissions(Object.values(savedMissions));
-          }
-          console.log("Loaded missions from Firebase:", savedMissions);
+          setMissions(Array.isArray(snapshot.val()) ? snapshot.val() : Object.values(snapshot.val()));
         } else {
-          // If no saved missions found, get completed missions to mark them in the initial state
-          const completedMissionsRef = ref(Firebase_Database, `users/${params.uid}/missionsCompleted`);
-          const completedSnapshot = await get(completedMissionsRef);
-          
-          if (completedSnapshot.exists()) {
-            const completedMissions = completedSnapshot.val();
-            // Mark completed missions in the initial state
-            const initialMissionsWithCompletion = INITIAL_GAME_STATE.missions.map(mission => ({
-              ...mission,
-              completed: !!completedMissions[mission.id]
-            }));
-            setMissions(initialMissionsWithCompletion);
-            
-            // Also save this to the missions node for future reference
-            await update(userMissionsRef, initialMissionsWithCompletion);
-          } else {
-            // If no completed missions either, use initial state
-            setMissions(INITIAL_GAME_STATE.missions);
-            // Save initial missions to Firebase
-            await update(userMissionsRef, INITIAL_GAME_STATE.missions);
-          }
+          setMissions(INITIAL_GAME_STATE.missions);
+          await update(missionsRef, INITIAL_GAME_STATE.missions);
+        }
+
+        const progressRef = ref(Firebase_Database, `users/${params.uid}/missionProgress`);
+        const progressSnapshot = await get(progressRef);
+        if (progressSnapshot.exists()) {
+          const progressData = progressSnapshot.val();
+          setMissionProgress({
+            wateredCrops: progressData.wateredCrops || 0,
+            plantedCrops: progressData.plantedCrops || 0,
+            harvestedCrops: progressData.harvestedCrops || 0,
+            usedTools: progressData.usedTools || {},
+            usedFertilizers: progressData.usedFertilizers || {},
+          });
         }
       } catch (error) {
-        console.error("Error loading missions:", error);
-        setMissions(INITIAL_GAME_STATE.missions);
+        console.error("Error loading missions or progress:", error);
       }
     };
-    
     loadMissions();
   }, [params.uid]);
+
+  const handleMissionProgress = (action: string, details: any) => {
+    setMissionProgress(prev => {
+      const newProgress = { ...prev };
+      switch (action) {
+        case 'waterCrop':
+          newProgress.wateredCrops += 1;
+          break;
+        case 'plantCrop':
+          newProgress.plantedCrops += 1;
+          if (details.cropType.includes('Ornamental')) newProgress.plantedCrops += 1; // Adjust for specific missions
+          break;
+        case 'harvestCrop':
+          newProgress.harvestedCrops += 1;
+          break;
+        case 'useTool':
+          newProgress.usedTools[details.tool] = (newProgress.usedTools[details.tool] || 0) + 1;
+          break;
+        case 'useFertilizer':
+          newProgress.usedFertilizers = newProgress.usedFertilizers || {};
+          newProgress.usedFertilizers[details.type] = (newProgress.usedFertilizers[details.type] || 0) + 1;
+          break;
+      }
+
+      // Check mission completion
+      const updatedMissions = missions.map(mission => {
+        if (mission.completed) return mission;
+        let isComplete = false;
+        if (mission.title.includes('Mag Dilig ng') && mission.title.match(/(\d+)/)) {
+          const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
+          isComplete = newProgress.wateredCrops >= required;
+        } else if (mission.title.includes('Mag tanim ng') && mission.title.match(/(\d+)/)) {
+          const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
+          isComplete = newProgress.plantedCrops >= required;
+        } else if (mission.title === 'Gumamit ng Asarol') {
+          isComplete = (newProgress.usedTools['Asarol'] || 0) >= 1;
+        } else if (mission.title === 'Gumamit ng Synthetic Fertilizer') {
+          isComplete = (newProgress.usedFertilizers['Synthetic Fertilizer'] || 0) >= 1;
+        } else if (mission.title === 'Gumamit ng Organic Fertilizer') {
+          isComplete = (newProgress.usedFertilizers['Organic Fertilizer'] || 0) >= 1;
+        } else if (mission.title === 'Mag tanim ng tree') {
+          isComplete = newProgress.plantedCrops >= 1 && details.cropType === 'Mangga'; 
+        }
+
+        return isComplete ? { ...mission, completed: true } : mission;
+      });
+
+      setMissions(updatedMissions);
+      if (params.uid) {
+        update(ref(Firebase_Database, `users/${params.uid}`), {
+          missions: updatedMissions,
+          missionProgress: newProgress,
+        });
+      }
+
+      return newProgress;
+    });
+  };
 
   useEffect(() => {
     const loadDecomposedItems = async () => {
@@ -605,32 +662,13 @@ type PlotStatus = {
   };
 
   const handleMissionComplete = async (missionId: number, answer: string) => {
-    if (!params.uid) {
-      console.error("Cannot complete mission: User ID is missing");
-      return;
-    }
-    
+    if (!params.uid) return;
     try {
-      // Update local state
-      const updatedMissions = missions.map(mission => 
-        mission.id === missionId 
-          ? { ...mission, completed: true } 
-          : mission
-      );
-      setMissions(updatedMissions);
-      
-      // Find the completed mission to get the reward
-      const completedMission = missions.find(m => m.id === missionId);
-      if (completedMission) {
-        // Add mission reward to money
-        await handleUpdateMoney(completedMission.reward);
-        
-        // Update statistics if needed
-        await handleUpdateStatistics({ 
-          moneyEarned: completedMission.reward
-        });
-        
-        console.log(`Mission ${missionId} completed. Reward: ₱${completedMission.reward}.00`);
+      const mission = missions.find(m => m.id === missionId);
+      if (mission && mission.completed) {
+        await handleUpdateMoney(mission.reward);
+        await handleUpdateStatistics({ moneyEarned: mission.reward });
+        console.log(`Mission ${missionId} rewarded. Reward: ₱${mission.reward}.00`);
       }
     } catch (error) {
       console.error("Error in handleMissionComplete:", error);
@@ -887,6 +925,7 @@ useEffect(() => {
           decomposedItems={decomposedItems}
           onAddToDecompose={handleAddToDecompose}
           onAddToNormalInventory={onAddToNormalInventory}
+          onMissionProgress={handleMissionProgress}
         />
       </View>
     </ImageBackground>
