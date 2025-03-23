@@ -178,7 +178,7 @@ interface MissionProgress {
         } else if (mission.title === 'Mag tanim ng tree') {
           isComplete = newProgress.plantedCrops >= 1 && details.cropType === 'Mangga'; 
         }
-
+        // Jukabg ay amag benta ng resh plants at mag sell ng prutas at gumawa ng organic 
         return isComplete ? { ...mission, completed: true } : mission;
       });
 

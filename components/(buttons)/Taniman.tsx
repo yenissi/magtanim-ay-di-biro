@@ -55,7 +55,7 @@ const HARVEST_VALUES = {
   Papaya: { normal: 100, rotted: 0 },
 } as const;
 
-const INFESTATION_CHANCE = 1; // chance of infestation
+const INFESTATION_CHANCE = 0.1; // chance of infestation
 const INFESTATION_CHECK_INTERVAL = 10000; // Check every 10 seconds
 const DECAY_TIME = 30000; // 30 seconds to treat infestation before decay
 const FERTILIZER_GROWTH_MULTIPLIER = 0.5 ; // Reduces growth time by 10%
