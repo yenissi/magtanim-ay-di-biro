@@ -55,35 +55,51 @@ const HARVEST_VALUES = {
   Papaya: { normal: 100, rotted: 0 },
 } as const;
 
-const INFESTATION_CHANCE = 0.1; // chance of infestation
-const INFESTATION_CHECK_INTERVAL = 10000; // Check every 10 seconds
-const DECAY_TIME = 30000; // 30 seconds to treat infestation before decay
-const FERTILIZER_GROWTH_MULTIPLIER = 0.5 ; // Reduces growth time by 10%
+const INFESTATION_CHANCE = 0.1;
+const INFESTATION_CHECK_INTERVAL = 10000;
+const DECAY_TIME = 30000;
+const FERTILIZER_GROWTH_MULTIPLIER = 0.5;
+const DROUGHT_CHANCE = 0.1;
+const DROUGHT_CHECK_INTERVAL = 10000;
+const DROUGHT_DECAY_TIME = 30000;
+const FLOOD_CHANCE = 0.1;
+const FLOOD_CHECK_INTERVAL = 30000;
 
-const DROUGHT_CHANCE = 0.1; // 10% chance of drought
-const DROUGHT_CHECK_INTERVAL = 10000; // Check every 15 seconds
-const DROUGHT_DECAY_TIME = 30000; // 30 seconds to water plants before damage
-const FLOOD_CHANCE = 0.1; // 50% chance of flood
-const FLOOD_CHECK_INTERVAL = 30000; // Check every 30 seconds
+// Tutorial Overlay Component
+const TutorialOverlay = ({ message, onNext, onClose }) => (
+  <View className="absolute top-[-75px] right-[-100px] w-[400px] p-[8px]">
+    <View className="bg-white p-3 rounded-lg" pointerEvents="auto">
+      <Text className="text-[14px] font-normal mb-2">{message}</Text>
+      <View className="flex-row justify-end">
+        <TouchableOpacity onPress={onNext} className="bg-green-500 p-[8px] rounded-lg">
+          <Text className="text-white text-[12px]">Next</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={onClose} className="ml-2 bg-gray-500 p-[8px] rounded-lg">
+          <Text className="text-white text-[12px]">Skip</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  </View>
+);
 
 interface TanimanProps {
   inventory: InventoryItem[];
   onUpdateMoney: (amount: number) => void;
-  onUpdateStatistics: (stats: { plantsGrown?: number, moneyEarned?: number }) => void;
+  onUpdateStatistics: (stats: { plantsGrown?: number; moneyEarned?: number }) => void;
   selectedItem: InventoryItem | null;
   userMoney: number;
   onAddToInventory: (item: InventoryItem) => void;
   initialPlotsState?: PlotStatus[][];
   onSavePlotsState: (plotsData: PlotStatus[][]) => void;
-  onUseItem: (item: InventoryItem) => void; 
+  onUseItem: (item: InventoryItem) => void;
   onAddToDecompose: (item: InventoryItem) => void;
   decomposedItems: InventoryItem[];
   onAddToNormalInventory: (item: InventoryItem) => void;
   onMissionProgress?: (action: string, details: any) => void;
 }
 
-export const Taniman: React.FC<TanimanProps> = ({ 
-  inventory, 
+export const Taniman: React.FC<TanimanProps> = ({
+  inventory,
   onUpdateMoney,
   onUpdateStatistics,
   selectedItem,
@@ -94,51 +110,217 @@ export const Taniman: React.FC<TanimanProps> = ({
   onUseItem,
   onAddToDecompose,
   onAddToNormalInventory,
-  decomposedItems, 
-  onMissionProgress
+  decomposedItems,
+  onMissionProgress,
 }) => {
   const GRID_SIZE = 3;
   const [sound, setSound] = useState<Audio.Sound | null>(null);
   const [refresh, setRefresh] = useState(false);
   const soundTimeoutRef = useRef<NodeJS.Timeout>();
-
   const infestationTimersRef = useRef<TimerMap>({});
   const decayTimersRef = useRef<TimerMap>({});
-  const droughtTimersRef = useRef<TimerMap>({}); 
-  const droughtDecayTimersRef = useRef<TimerMap>({}); 
-  const floodTimersRef = useRef<TimerMap>({}); 
+  const droughtTimersRef = useRef<TimerMap>({});
+  const droughtDecayTimersRef = useRef<TimerMap>({});
+  const floodTimersRef = useRef<TimerMap>({});
+  const [isNewUser, setIsNewUser] = useState<boolean | null>(null);
 
-  const triggerRefresh = () => setRefresh(prev => !prev);
+  const [tutorialStep, setTutorialStep] = useState<number>(0);
+  const [isTutorialActive, setIsTutorialActive] = useState<boolean>(true);
+  const [isFirstStepCompleted, setIsFirstStepCompleted] = useState<boolean>(false);
+  const [isThirdStepCompleted, setIsThirdStepCompleted] = useState<boolean>(false);
+  const [isFifthStepCompleted, setIsFifthStepCompleted] = useState<boolean>(false);
+  const [isEighthStepCompleted, setIsEighthStepCompleted] = useState<boolean>(false);
+  const [isTenthStepCompleted, setIsTenthStepCompleted] = useState<boolean>(false);
+
+  const tutorialSteps = [
+    { message: "Welcome to Taniman! Let's learn how to grow crops.", highlight: null },
+    { message: "First, select the 'Asarol' tool in the bag to plow the soil.", highlight: "Asarol" },
+    { message: "Now, tap on an empty plot to plow it.", highlight: "plot" },
+    { message: "Second, select the 'Regadera' tool in the bag to water the plot.", highlight: "Regadera" },
+    { message: "Now, tap on a plowed plot to water it", highlight: "plot" },
+    { message: "Next, select a crop seed from your inventory.", highlight: "Sibuyas" },
+    { message: "Tap the watered plot to plant the seed.", highlight: "plot" },
+    { message: "Wait for the crop to grow. Click 'Next' to simulate growth.", highlight: "plot" },
+    { message: "To speed up growth, select 'Synthetic Fertilizer' in the bag.", highlight: "Synthetic Fertilizer" },
+    { message: "Tap the planted plot to apply the fertilizer.", highlight: "plot" },
+    { message: "Once the crop is fully grown, select the 'Itak' tool to harvest it.", highlight: "Itak" },
+    { message: "Tap the fully grown crop to harvest it.", highlight: "plot" },
+    { message: "Congratulations! You've completed the tutorial. Happy farming!", highlight: null },
+  ];
+
+  const [tutorialRequirements, setTutorialRequirements] = useState({
+    asarolSelected: false,
+    plotPlowed: false,
+    regaderaSelected: false,
+  });
+
+  const advanceTutorial = () => {
+    setTutorialStep((prevStep) => {
+      console.log(`Advancing from step ${prevStep} to ${prevStep + 1}`);
+      if (prevStep + 1 >= tutorialSteps.length) {
+        // Tutorial completed
+        setIsTutorialActive(false);
+        markTutorialCompleted();
+        return prevStep;
+      }
+      return prevStep + 1;
+    });
+  };
+
+  const markTutorialCompleted = async () => {
+    try {
+      const userId = Firebase_Auth.currentUser?.uid;
+      if (userId) {
+        // Save to Firebase for authenticated users
+        const tutorialRef = ref(Firebase_Database, `users/${userId}/tutorialCompleted`);
+        await set(tutorialRef, true);
+      }
+      // Save to AsyncStorage for all users
+      await AsyncStorage.setItem('tutorialCompleted', 'true');
+    } catch (error) {
+      console.error('Error marking tutorial completed:', error);
+    }
+  };
+
+  // Check tool selection for tutorial steps
+  useEffect(() => {
+    console.log(`Current step: ${tutorialStep}, Selected item: ${selectedItem?.title}`);
+    if (isTutorialActive) {
+        switch (tutorialStep) {
+            case 1: // Asarol selection step
+                if (selectedItem?.title === 'Asarol') {
+                    setTutorialRequirements(prev => ({ ...prev, asarolSelected: true }));
+                    advanceTutorial();
+                }
+                break;
+
+            case 2: // Plot plowing step
+                if (plots.some(row => row.some(plot => plot.isPlowed))) {
+                    setTutorialRequirements(prev => ({ ...prev, plotPlowed: true }));
+                    advanceTutorial();
+                }
+                break;
+
+            case 3: // Regadera selection step
+                if (selectedItem?.title === 'Regadera') {
+                    setTutorialRequirements(prev => ({ ...prev, regaderaSelected: true }));
+                    advanceTutorial();
+                }
+                break;
+
+            case 4: // Plot watering step
+                if (plots.some(row => row.some(plot => plot.isWatered))) {
+                    advanceTutorial();
+                }
+                break;
+
+            case 5: // Seed selection step
+                if (selectedItem?.type === 'crop' || selectedItem?.type === 'tree') {
+                    advanceTutorial();
+                }
+                break;
+
+            case 6: // Planting step
+                if (plots.some(row => row.some(plot => plot.plant && plot.plant.stage === 0))) {
+                    advanceTutorial();
+                }
+                break;
+
+            case 7: // Waiting for growth (manual advance handled by "Next" button)
+                // No automatic check needed - user clicks "Next" to proceed
+                break;
+
+            case 8: // Fertilizer selection step
+                if (selectedItem?.title === 'Synthetic Fertilizer') {
+                    advanceTutorial();
+                }
+                break;
+
+            case 9: // Fertilizer application step
+                if (plots.some(row => row.some(plot => plot.plant?.isFertilized))) {
+                    advanceTutorial();
+                }
+                break;
+
+            case 10: // Itak selection step
+                if (selectedItem?.title === 'Itak') {
+                    advanceTutorial();
+                }
+                break;
+
+            case 11: // Harvesting step
+                if (plots.some(row => row.some(plot => plot.plant?.stage === 3))) {
+                }
+                break;
+
+            case 12: // Final step (congratulations)
+                break;
+        }
+    }
+}, [selectedItem, tutorialStep, isTutorialActive, plots]);
+
+
+useEffect(() => {
+  const checkNewUser = async () => {
+    try {
+      const userId = Firebase_Auth.currentUser?.uid;
+      let isNew = true;
+
+      if (userId) {
+        // Check Firebase first
+        const tutorialRef = ref(Firebase_Database, `users/${userId}/tutorialCompleted`);
+        const snapshot = await get(tutorialRef);
+        isNew = !snapshot.exists() || !snapshot.val();
+      } else {
+        // Fallback to AsyncStorage for non-authenticated users
+        const tutorialCompleted = await AsyncStorage.getItem('tutorialCompleted');
+        isNew = !tutorialCompleted;
+      }
+
+      setIsNewUser(isNew);
+      setIsTutorialActive(isNew);
+    } catch (error) {
+      console.error('Error checking new user status:', error);
+      setIsNewUser(true); // Default to showing tutorial if there's an error
+      setIsTutorialActive(true);
+    }
+  };
+
+  checkNewUser();
+}, []);
+
+  const triggerRefresh = () => setRefresh((prev) => !prev);
 
   const [plots, setPlots] = useState<PlotStatus[][]>(
-    initialPlotsState || Array(GRID_SIZE).fill(null).map(() => 
+    initialPlotsState || Array(GRID_SIZE).fill(null).map(() =>
       Array(GRID_SIZE).fill(null).map(() => ({
         isPlowed: false,
         isWatered: false,
-        plant: undefined
+        plant: undefined,
       }))
     )
   );
-  // Save plots state whenever it changes
+
   useEffect(() => {
     onSavePlotsState(plots);
-    // console.log('Updated plots state:', JSON.stringify(plots, null, 2));
   }, [plots]);
+
   const [timers, setTimers] = useState<{
     growth: { [plotId: string]: number };
     decay: { [plotId: string]: number };
-    drought: { [plotId: string]: number }; 
+    drought: { [plotId: string]: number };
   }>({
     growth: {},
     decay: {},
     drought: {},
   });
+
   const formatTime = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
-  // Timer update effect
+
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date().getTime();
@@ -148,30 +330,22 @@ export const Taniman: React.FC<TanimanProps> = ({
         row.forEach((plot, colIndex) => {
           const plotId = `${rowIndex}-${colIndex}`;
           if (plot.plant) {
-            // Growth timer
             if (plot.plant.stage < 3) {
               const timeRemaining = Math.max(0, plot.plant.readyAt.getTime() - now);
               newTimers.growth[plotId] = timeRemaining;
             }
-
-            // Decay timer (if infested)
             if (plot.plant.hasInfestation && !plot.plant.isRotted) {
-              const infestationStartTime = plot.plant.readyAt.getTime(); // Assuming infestation starts when plant reaches stage 3
+              const infestationStartTime = plot.plant.readyAt.getTime();
               const decayTimeRemaining = Math.max(0, infestationStartTime + DECAY_TIME - now);
               newTimers.decay[plotId] = decayTimeRemaining;
-
-              // Check if decay timer has reached zero - apply rot immediately
               if (decayTimeRemaining === 0 && plot.plant.hasInfestation) {
                 handlePlantDecay(rowIndex, colIndex);
               }
             }
-            // Drought timer
             if (plot.plant.needsWater && !plot.plant.isRotted) {
-              const droughtStartTime = plot.plant.readyAt.getTime(); // Using same timing mechanism
+              const droughtStartTime = plot.plant.readyAt.getTime();
               const droughtTimeRemaining = Math.max(0, droughtStartTime + DROUGHT_DECAY_TIME - now);
               newTimers.drought[plotId] = droughtTimeRemaining;
-
-              // Check if drought timer has reached zero - apply withering immediately
               if (droughtTimeRemaining === 0 && plot.plant.needsWater) {
                 handleDroughtDamage(rowIndex, colIndex);
               }
@@ -185,139 +359,82 @@ export const Taniman: React.FC<TanimanProps> = ({
 
     return () => clearInterval(interval);
   }, [plots]);
-  // Setup infestation timers for existing plants when component mounts
+
   useEffect(() => {
-    // First, clear any existing timers
     clearAllTimers();
-    // Then set up new timers for all existing plants
     plots.forEach((row, rowIndex) => {
       row.forEach((plot, colIndex) => {
         if (plot.plant && plot.plant.stage === 3 && !plot.plant.isRotted) {
-          // Start infestation checks
           startInfestationCheck(rowIndex, colIndex);
-          
-          // Start drought checks
           startDroughtCheck(rowIndex, colIndex);
         }
-        // Start flood checks for all plots
         startFloodCheck(rowIndex, colIndex);
       });
     });
-    
-    // Cleanup function
+
     return () => {
       clearAllTimers();
-      if (sound) {
-        sound.unloadAsync();
-      }
-      if (soundTimeoutRef.current) {
-        clearTimeout(soundTimeoutRef.current);
-      }
+      if (sound) sound.unloadAsync();
+      if (soundTimeoutRef.current) clearTimeout(soundTimeoutRef.current);
     };
   }, []);
+
   const clearAllTimers = () => {
-    // Clear all infestation timers
-    Object.values(infestationTimersRef.current).forEach(timer => {
-      clearInterval(timer);
-    });
+    Object.values(infestationTimersRef.current).forEach((timer) => clearInterval(timer));
     infestationTimersRef.current = {};
-    
-    // Clear all decay timers
-    Object.values(decayTimersRef.current).forEach(timer => {
-      clearTimeout(timer);
-    });
+    Object.values(decayTimersRef.current).forEach((timer) => clearTimeout(timer));
     decayTimersRef.current = {};
-
-    // Clear all drought timers
-    Object.values(droughtTimersRef.current).forEach(timer => {
-      clearInterval(timer);
-    });
+    Object.values(droughtTimersRef.current).forEach((timer) => clearInterval(timer));
     droughtTimersRef.current = {};
-    
-    // Clear all drought decay timers
-    Object.values(droughtDecayTimersRef.current).forEach(timer => {
-      clearTimeout(timer);
-    });
+    Object.values(droughtDecayTimersRef.current).forEach((timer) => clearTimeout(timer));
     droughtDecayTimersRef.current = {};
-    
-    // Clear all flood timers
-    Object.values(floodTimersRef.current).forEach(timer => {
-      clearInterval(timer);
-    });
+    Object.values(floodTimersRef.current).forEach((timer) => clearInterval(timer));
     floodTimersRef.current = {};
-
   };
+
   const clearPlotTimers = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    
-    // Clear infestation timer if exists
     if (infestationTimersRef.current[plotId]) {
       clearInterval(infestationTimersRef.current[plotId]);
       delete infestationTimersRef.current[plotId];
     }
-    
-    // Clear decay timer if exists
     if (decayTimersRef.current[plotId]) {
       clearTimeout(decayTimersRef.current[plotId]);
       delete decayTimersRef.current[plotId];
     }
-    // Clear drought timer if exists
     if (droughtTimersRef.current[plotId]) {
       clearInterval(droughtTimersRef.current[plotId]);
       delete droughtTimersRef.current[plotId];
     }
-    
-    // Clear drought decay timer if exists
     if (droughtDecayTimersRef.current[plotId]) {
       clearTimeout(droughtDecayTimersRef.current[plotId]);
       delete droughtDecayTimersRef.current[plotId];
     }
-    
-    // Clear flood timer if exists
     if (floodTimersRef.current[plotId]) {
       clearInterval(floodTimersRef.current[plotId]);
       delete floodTimersRef.current[plotId];
     }
   };
+
   const playTimedSound = async (soundFile: number) => {
     try {
-      // Ensure the previous sound is safely unloaded
       if (sound) {
-        try {
-          const status = await sound.getStatusAsync();
-          if (status.isLoaded) {
-            await sound.stopAsync();
-            await sound.unloadAsync();
-          }
-        } catch (error) {
-          console.log("Error checking sound status:", error);
-          // Continue anyway, as we'll create a new sound instance
+        const status = await sound.getStatusAsync();
+        if (status.isLoaded) {
+          await sound.stopAsync();
+          await sound.unloadAsync();
         }
         setSound(null);
       }
-    
-      // Create and load the sound before trying to play it
-      const { sound: newSound } = await Audio.Sound.createAsync(
-        soundFile,
-        { shouldPlay: false } // Don't auto-play until fully loaded
-      );
-      
+      const { sound: newSound } = await Audio.Sound.createAsync(soundFile, { shouldPlay: false });
       setSound(newSound);
-      
-      // Wait until loaded then play
       await newSound.playAsync();
-    
-      // Set up cleanup timeout
       soundTimeoutRef.current = setTimeout(async () => {
         if (newSound) {
-          try {
-            const currentStatus = await newSound.getStatusAsync();
-            if (currentStatus.isLoaded) {
-              await newSound.stopAsync();
-              await newSound.unloadAsync();
-            }
-          } catch (error) {
-            console.log("Error during sound cleanup:", error);
+          const currentStatus = await newSound.getStatusAsync();
+          if (currentStatus.isLoaded) {
+            await newSound.stopAsync();
+            await newSound.unloadAsync();
           }
           setSound(null);
         }
@@ -326,168 +443,91 @@ export const Taniman: React.FC<TanimanProps> = ({
       console.error('Failed to play sound:', error);
     }
   };
+
   const startInfestationCheck = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    
-    // Clear any existing timer first
-    if (infestationTimersRef.current[plotId]) {
-      clearInterval(infestationTimersRef.current[plotId]);
-    }
-    
-    // Create new infestation check timer
+    if (infestationTimersRef.current[plotId]) clearInterval(infestationTimersRef.current[plotId]);
     const timer = setInterval(() => {
-      setPlots(current => {
+      setPlots((current) => {
         const plot = current[row][col];
-        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted) {
-          return current; // No change needed
-        }
-        
-        // Apply infestation with 100% chance
+        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted) return current;
         if (Math.random() < INFESTATION_CHANCE) {
           console.log(`Infestation triggered for plant at [${row},${col}]`);
-          
           const newPlots = [...current];
           newPlots[row] = [...newPlots[row]];
           newPlots[row][col] = {
             ...newPlots[row][col],
-            plant: {
-              ...newPlots[row][col].plant!,
-              hasInfestation: true
-            }
+            plant: { ...newPlots[row][col].plant!, hasInfestation: true },
           };
-          
-          // Start the decay timer
           startDecayTimer(row, col);
-          
           return newPlots;
         }
-        
-        return current; // No changes
+        return current;
       });
     }, INFESTATION_CHECK_INTERVAL);
-    
-    // Store the timer ID
     infestationTimersRef.current[plotId] = timer;
-    
     console.log(`Started infestation check for plant at [${row},${col}]`);
     return timer;
   };
-  // New function for drought checks
+
   const startDroughtCheck = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    
-    // Clear any existing timer first
-    if (droughtTimersRef.current[plotId]) {
-      clearInterval(droughtTimersRef.current[plotId]);
-    }
-    
-    // Create new drought check timer
+    if (droughtTimersRef.current[plotId]) clearInterval(droughtTimersRef.current[plotId]);
     const timer = setInterval(() => {
-      setPlots(current => {
+      setPlots((current) => {
         const plot = current[row][col];
-        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted || plot.plant.needsWater) {
-          return current; // No change needed
-        }
-        
-        // Apply drought with the defined chance
+        if (!plot.plant || plot.plant.stage !== 3 || plot.plant.isRotted || plot.plant.needsWater) return current;
         if (Math.random() < DROUGHT_CHANCE) {
           console.log(`Drought triggered for plant at [${row},${col}]`);
-          
           const newPlots = [...current];
           newPlots[row] = [...newPlots[row]];
           newPlots[row][col] = {
             ...newPlots[row][col],
-            isWatered: false, // Plant loses its watered status
-            plant: {
-              ...newPlots[row][col].plant!,
-              needsWater: true
-            }
+            isWatered: false,
+            plant: { ...newPlots[row][col].plant!, needsWater: true },
           };
-          
-          // Start the drought decay timer
           startDroughtDecayTimer(row, col);
-          
-          // Alert the user
-          Alert.alert(
-            "Drought!", 
-            `Your ${plot.plant.cropType} needs water! Use Regadera to prevent withering.`
-          );
-          
+          Alert.alert('Drought!', `Your ${plot.plant.cropType} needs water! Use Regadera to prevent withering.`);
           return newPlots;
         }
-        
-        return current; // No changes
+        return current;
       });
     }, DROUGHT_CHECK_INTERVAL);
-    
-    // Store the timer ID
     droughtTimersRef.current[plotId] = timer;
-    
     console.log(`Started drought check for plant at [${row},${col}]`);
     return timer;
   };
-  // New function for flood checks
+
   const startFloodCheck = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    
-    // Clear any existing timer first
-    if (floodTimersRef.current[plotId]) {
-      clearInterval(floodTimersRef.current[plotId]);
-    }
-    
-    // Create new flood check timer
+    if (floodTimersRef.current[plotId]) clearInterval(floodTimersRef.current[plotId]);
     const timer = setInterval(() => {
-      setPlots(current => {
+      setPlots((current) => {
         const plot = current[row][col];
-        if (plot.isFlooded) {
-          return current; // No change needed if already flooded
-        }
-        
-        // Apply flood with the defined chance
-        if (Math.random() < FLOOD_CHANCE) {
-          // Handle the flood in a separate function
-          handleFlood(row, col);
-        }
-        
-        return current; // This will be updated by handleFlood if needed
+        if (plot.isFlooded) return current;
+        if (Math.random() < FLOOD_CHANCE) handleFlood(row, col);
+        return current;
       });
     }, FLOOD_CHECK_INTERVAL);
-    
-    // Store the timer ID
     floodTimersRef.current[plotId] = timer;
-    
-    // console.log(`Started flood check for plot at [${row},${col}]`);
     return timer;
   };
+
   const startDecayTimer = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    // Clear any existing decay timer first
-    if (decayTimersRef.current[plotId]) {
-      clearTimeout(decayTimersRef.current[plotId]);
-    }
+    if (decayTimersRef.current[plotId]) clearTimeout(decayTimersRef.current[plotId]);
     const timer = setTimeout(() => {
-      setPlots(current => {
+      setPlots((current) => {
         const plot = current[row][col];
-        if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) {
-          return current; // No change needed
-        }
+        if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) return current;
         console.log(`Decay timer triggered for infested plant at [${row},${col}]`);
         const newPlots = [...current];
         newPlots[row] = [...newPlots[row]];
         newPlots[row][col] = {
           ...newPlots[row][col],
-          plant: {
-            ...newPlots[row][col].plant!,
-            isRotted: true,
-            hasInfestation: false
-          }
+          plant: { ...newPlots[row][col].plant!, isRotted: true, hasInfestation: false },
         };
-        
-        // Alert the user
-        Alert.alert(
-          "Plant Rotted!", 
-          `Your ${plot.plant.cropType} has rotted due to untreated infestation. Harvest value will be reduced.`
-        );
+        Alert.alert('Plant Rotted!', `Your ${plot.plant.cropType} has rotted due to untreated infestation.`);
         return newPlots;
       });
     }, DECAY_TIME);
@@ -495,35 +535,22 @@ export const Taniman: React.FC<TanimanProps> = ({
     console.log(`Started decay timer for infested plant at [${row},${col}]`);
     return timer;
   };
+
   const startDroughtDecayTimer = (row: number, col: number) => {
     const plotId = `${row}-${col}`;
-    // Clear any existing drought decay timer first
-    if (droughtDecayTimersRef.current[plotId]) {
-      clearTimeout(droughtDecayTimersRef.current[plotId]);
-    }
+    if (droughtDecayTimersRef.current[plotId]) clearTimeout(droughtDecayTimersRef.current[plotId]);
     const timer = setTimeout(() => {
-      setPlots(current => {
+      setPlots((current) => {
         const plot = current[row][col];
-        if (!plot.plant || !plot.plant.needsWater || plot.plant.isRotted) {
-          return current; // No change needed
-        }
+        if (!plot.plant || !plot.plant.needsWater || plot.plant.isRotted) return current;
         console.log(`Drought decay timer triggered for plant at [${row},${col}]`);
         const newPlots = [...current];
         newPlots[row] = [...newPlots[row]];
         newPlots[row][col] = {
           ...newPlots[row][col],
-          plant: {
-            ...newPlots[row][col].plant!,
-            isRotted: true,
-            needsWater: false
-          }
+          plant: { ...newPlots[row][col].plant!, isRotted: true, needsWater: false },
         };
-        
-        // Alert the user
-        Alert.alert(
-          "Plant Withered!", 
-          `Your ${plot.plant.cropType} has withered due to drought. Harvest value will be reduced.`
-        );
+        Alert.alert('Plant Withered!', `Your ${plot.plant.cropType} has withered due to drought.`);
         return newPlots;
       });
     }, DROUGHT_DECAY_TIME);
@@ -531,33 +558,25 @@ export const Taniman: React.FC<TanimanProps> = ({
     console.log(`Started drought decay timer for plant at [${row},${col}]`);
     return timer;
   };
+
   useEffect(() => {
     const growthTimer = setInterval(() => {
-      setPlots(currentPlots => {
+      setPlots((currentPlots) => {
         let updated = false;
         const newPlots = currentPlots.map((row, rowIndex) =>
           row.map((plot, colIndex) => {
             if (plot.plant) {
               const now = new Date();
               if (now >= plot.plant.readyAt && plot.plant.stage < 3) {
-                // Plant has advanced to next stage
                 updated = true;
-                
-                // Check if plant has just reached stage 3 (fully grown)
                 const newStage = plot.plant.stage + 1;
                 if (newStage === 3) {
-                  // Start infestation checks now that the plant is mature
                   startInfestationCheck(rowIndex, colIndex);
-                  // Start drought checks now that the plant is mature
                   startDroughtCheck(rowIndex, colIndex);
                 }
-                
                 return {
                   ...plot,
-                  plant: {
-                    ...plot.plant,
-                    stage: newStage
-                  }
+                  plant: { ...plot.plant, stage: newStage },
                 };
               }
             }
@@ -570,131 +589,88 @@ export const Taniman: React.FC<TanimanProps> = ({
 
     return () => clearInterval(growthTimer);
   }, []);
+
   const handleHarvest = async (row: number, col: number, plot: PlotStatus, onComplete?: () => void) => {
     if (plot.plant?.hasInfestation && !plot.plant.isRotted) {
-      Alert.alert(
-        "Cannot Harvest", 
-        "This plant has an infestation. Treat it with pesticide before harvesting, or wait for it to rot."
-      );
+      Alert.alert('Cannot Harvest', 'This plant has an infestation. Treat it with pesticide first.');
       return;
     }
     if (plot.plant?.stage === 3) {
       const cropType = plot.plant.cropType as keyof typeof HARVEST_VALUES;
-      let harvestValue = plot.plant.isRotted 
-        ? HARVEST_VALUES[cropType].rotted 
+      let harvestValue = plot.plant.isRotted
+        ? HARVEST_VALUES[cropType].rotted
         : HARVEST_VALUES[cropType].normal;
-  
-      // Double harvest value if fertilized
-      if (plot.plant.isFertilized) {
-        harvestValue *= 2;
-      }
-  
-      // Create a unique ID using timestamp with microseconds
+      if (plot.plant.isFertilized) harvestValue *= 2;
+
       const uniqueTimestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 11);
       const uniqueCounter = (global.harvestCounter = (global.harvestCounter || 0) + 1);
-      
       const uniqueId = plot.plant.isRotted
         ? `rotted-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`
         : `normal-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`;
-  
-      // Create a harvested crop item to add to inventory
+
       const harvestedCrop: InventoryItem = {
         id: uniqueId,
-        title: `${plot.plant.isRotted ? 'Rotted ' : ''} ${cropType}`,
+        title: `${plot.plant.isRotted ? 'Rotted ' : ''}${cropType}`,
         type: 'harvestedCrop',
-        description: plot.plant.isRotted 
-          ? `A rotted ${cropType} with reduced value.` 
+        description: plot.plant.isRotted
+          ? `A rotted ${cropType} with reduced value.`
           : `A freshly harvested ${cropType} ready to be sold.`,
         price: 0,
         sellPrice: harvestValue,
-        image: plot.plant.image
+        image: plot.plant.image,
       };
-  
-      console.log('Harvested crop created:', harvestedCrop);
-  
-      // Clear the plot after harvesting
-      setPlots(current => {
+
+      setPlots((current) => {
         const newPlots = [...current];
         newPlots[row] = [...newPlots[row]];
-        newPlots[row][col] = {
-          isPlowed: false,
-          isWatered: false,
-          isFlooded: false,
-          plant: undefined
-        };
-        // triggerRefresh();
+        newPlots[row][col] = { isPlowed: false, isWatered: false, isFlooded: false, plant: undefined };
         return newPlots;
       });
 
       clearPlotTimers(row, col);
-      await savePlantsToFirebase();  
+      await savePlantsToFirebase();
       const userId = Firebase_Auth.currentUser?.uid;
-  
-      // Update statistics first
+
       if (userId) {
         const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
         const statsSnapshot = await get(userStatsRef);
-        const currentStats = statsSnapshot.val() || { 
-          rottedHarvested: 0, 
-          normalHarvested: 0,
-          itemsSold: 0 
-        };
-        
-        // Update the appropriate statistic
+        const currentStats = statsSnapshot.val() || { rottedHarvested: 0, normalHarvested: 0, itemsSold: 0 };
         if (plot.plant.isRotted) {
           currentStats.rottedHarvested = (currentStats.rottedHarvested || 0) + 1;
         } else {
           currentStats.normalHarvested = (currentStats.normalHarvested || 0) + 1;
         }
-        
-        // Save updated statistics
         await set(userStatsRef, currentStats);
       }
-  
+
       if (plot.plant.isRotted) {
         if (userId) {
           const rottedItemsRef = ref(Firebase_Database, `users/${userId}/rottedItems/${harvestedCrop.id}`);
           await set(rottedItemsRef, harvestedCrop);
-          console.log('Rotted crop saved to Firebase');
-          
-          Alert.alert(
-            'Harvest Complete!',
-            `Rotted ${cropType} has been sent to compost.`
-          );
+          Alert.alert('Harvest Complete!', `Rotted ${cropType} has been sent to compost.`);
         } else {
           onAddToDecompose(harvestedCrop);
-          Alert.alert(
-            'Harvest Complete!',
-            `Rotted ${cropType} has been sent to compost. Sign in to save your progress!`
-          );
+          Alert.alert('Harvest Complete!', `Rotted ${cropType} has been sent to compost. Sign in to save!`);
         }
       } else {
         if (userId) {
           const normalItemsRef = ref(Firebase_Database, `users/${userId}/normalItems/${harvestedCrop.id}`);
           await set(normalItemsRef, harvestedCrop);
-          console.log('Normal crop saved to Firebase');
-          Alert.alert(
-            'Harvest Complete!',
-            `${cropType} has been harvested and added to your inventory.`
-          );
+          Alert.alert('Harvest Complete!', `${cropType} has been harvested and added to your inventory.`);
         } else {
-          if (typeof onAddToNormalInventory === 'function') {
-            onAddToNormalInventory(harvestedCrop);
-          }
-          Alert.alert(
-            'Harvest Complete!',
-            `${cropType} has been harvested and added to your inventory. Sign in to save your progress!`
-          );
+          onAddToNormalInventory(harvestedCrop);
+          Alert.alert('Harvest Complete!', `${cropType} has been harvested. Sign in to save!`);
         }
       }
-  
+
       onUpdateStatistics({ plantsGrown: 1 });
       onMissionProgress?.('harvestCrop', { cropType });
       playTimedSound(require('@/assets/sound/harvesting.mp3'));
-  
-      if (onComplete) {
-        onComplete();
+
+      if (onComplete) onComplete();
+      if (isTutorialActive && tutorialStep === 11) {
+        advanceTutorial();
       }
     }
   };
@@ -705,25 +681,15 @@ export const Taniman: React.FC<TanimanProps> = ({
     newPlots[row][col] = { ...newPlots[row][col], ...update };
     return newPlots;
   };
-  
+
   const savePlantsToFirebase = async () => {
     const userId = Firebase_Auth.currentUser?.uid;
-    if (!userId) {
-      console.log('No user logged in, skipping Firebase save.');
-      return;
-    }
-  
+    if (!userId) return;
+
     try {
-      const serializablePlots = plots.map(row => 
-        row.map(plot => {
-          // Create a clean plot object without undefined values
-          const cleanPlot = {
-            isPlowed: !!plot.isPlowed,
-            isWatered: !!plot.isWatered,
-            isFlooded: plot.isFlooded || false
-          };
-          
-          // Only add plant if it exists
+      const serializablePlots = plots.map((row) =>
+        row.map((plot) => {
+          const cleanPlot = { isPlowed: !!plot.isPlowed, isWatered: !!plot.isWatered, isFlooded: plot.isFlooded || false };
           if (plot.plant) {
             cleanPlot.plant = {
               id: plot.plant.id,
@@ -736,7 +702,7 @@ export const Taniman: React.FC<TanimanProps> = ({
               hasInfestation: !!plot.plant.hasInfestation,
               isRotted: !!plot.plant.isRotted,
               isFertilized: !!plot.plant.isFertilized,
-              needsWater: !!plot.plant.needsWater
+              needsWater: !!plot.plant.needsWater,
             };
           }
           return cleanPlot;
@@ -744,50 +710,34 @@ export const Taniman: React.FC<TanimanProps> = ({
       );
       const plotsRef = ref(Firebase_Database, `users/${userId}/plots`);
       await set(plotsRef, serializablePlots);
-      console.log('Plots saved to Firebase successfully');
     } catch (error) {
       console.error('Error saving plots to Firebase:', error);
-      throw error;
     }
   };
 
   useEffect(() => {
-  const userId = Firebase_Auth.currentUser?.uid;
-  if (!userId) return;
-  const timeout = setTimeout(() => {
-    savePlantsToFirebase().catch((error) =>
-      console.error('Debounced save error:', error)
-    );
-  }, 500); // Debounce by 500ms
-  return () => clearTimeout(timeout);
-}, [plots]);
-  // Add function to load planted crops from Firebase
+    const userId = Firebase_Auth.currentUser?.uid;
+    if (!userId) return;
+    const timeout = setTimeout(() => {
+      savePlantsToFirebase().catch((error) => console.error('Debounced save error:', error));
+    }, 500);
+    return () => clearTimeout(timeout);
+  }, [plots]);
+
   const loadPlantsFromFirebase = async () => {
     const userId = Firebase_Auth.currentUser?.uid;
     if (!userId) return false;
-  
+
     try {
       const plotsRef = ref(Firebase_Database, `users/${userId}/plots`);
       const snapshot = await get(plotsRef);
       const savedPlots = snapshot.val();
-      
-      if (!savedPlots) {
-        console.log('No saved plots found in Firebase');
-        return false;
-      }
-      
-      console.log('Found plots data in Firebase:', savedPlots);
-      
-      // Clear all existing timers first
+      if (!savedPlots) return false;
+
       clearAllTimers();
-      
-      // Convert dates back to Date objects
-      const deserializedPlots = savedPlots.map((row) => 
+      const deserializedPlots = savedPlots.map((row) =>
         row.map((plot) => {
-          if (!plot) {
-            return { isPlowed: false, isWatered: false, isFlooded: false };
-          }
-          // Create a new plot object with defaults
+          if (!plot) return { isPlowed: false, isWatered: false, isFlooded: false };
           const newPlot = {
             isPlowed: plot.isPlowed || false,
             isWatered: plot.isWatered || false,
@@ -807,26 +757,16 @@ export const Taniman: React.FC<TanimanProps> = ({
           return newPlot;
         })
       );
-      // Update the state
       setPlots(deserializedPlots);
-      console.log('Plots loaded from Firebase successfully');
       deserializedPlots.forEach((row, rowIndex) => {
         row.forEach((plot, colIndex) => {
-          startFloodCheck(rowIndex, colIndex); 
-  
+          startFloodCheck(rowIndex, colIndex);
           if (plot.plant) {
-            if (plot.plant.stage < 3) {
-              console.log(`Restored growing plant at [${rowIndex},${colIndex}]`);
-            } else if (plot.plant.stage === 3 && !plot.plant.isRotted) {
+            if (plot.plant.stage === 3 && !plot.plant.isRotted) {
               startInfestationCheck(rowIndex, colIndex);
               startDroughtCheck(rowIndex, colIndex);
-  
-              if (plot.plant.hasInfestation) {
-                startDecayTimer(rowIndex, colIndex);
-              }
-              if (plot.plant.needsWater) {
-                startDroughtDecayTimer(rowIndex, colIndex);
-              }
+              if (plot.plant.hasInfestation) startDecayTimer(rowIndex, colIndex);
+              if (plot.plant.needsWater) startDroughtDecayTimer(rowIndex, colIndex);
             }
           }
         });
@@ -837,249 +777,139 @@ export const Taniman: React.FC<TanimanProps> = ({
       return false;
     }
   };
+
   useEffect(() => {
     const loadData = async () => {
       const userId = Firebase_Auth.currentUser?.uid;
       if (userId) {
-        try {
-          console.log('Attempting to load plots from Firebase...');
-          const loaded = await loadPlantsFromFirebase();
-          console.log('Firebase load result:', loaded);
-          if (!loaded && initialPlotsState) {
-            setPlots(initialPlotsState);
-            await savePlantsToFirebase();
-          }
-        } catch (error) {
-          console.error('Error in initial data loading:', error);
-          if (initialPlotsState) {
-            setPlots(initialPlotsState);
-          }
+        const loaded = await loadPlantsFromFirebase();
+        if (!loaded && initialPlotsState) {
+          setPlots(initialPlotsState);
+          await savePlantsToFirebase();
         }
-      } 
-      else if (initialPlotsState) {
-        console.log('User not logged in, using initial state from props');
+      } else if (initialPlotsState) {
         setPlots(initialPlotsState);
       }
     };
     loadData();
     const unsubscribe = Firebase_Auth.onAuthStateChanged((user) => {
-      console.log('Auth state changed, user:', user?.uid);
-      if (user) {
-        loadData(); 
-      }
+      if (user) loadData();
     });
     return () => unsubscribe();
-  }, []);  
+  }, []);
 
-  const handlePlotPress = (row: number, col: number) => { 
+  const handlePlotPress = (row: number, col: number) => {
     if (!selectedItem) return;
 
     const plot = plots[row][col];
-    const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
+    if (isTutorialActive && tutorialSteps[tutorialStep].highlight === 'plot' && (row !== 0 || col !== 0)) {
+      Alert.alert('Tutorial', 'Please tap the top-left plot (0,0) to continue!');
+      return;
+    }
+
     if (plot.isFlooded) {
       if (selectedItem.title === 'Regadera') {
-        setPlots(current => {
-          const newPlots = [...current];
-          newPlots[row] = [...newPlots[row]];
-          newPlots[row][col] = {
-            isPlowed: false,
-            isWatered: false,
-            isFlooded: false,
-            plant: undefined
-          };
-          return newPlots;
-        });
-        
-        Alert.alert("Plot Drained", "You've successfully drained the flooded plot.");
+        setPlots((current) => updatePlot(current, row, col, { isPlowed: false, isWatered: false, isFlooded: false, plant: undefined }));
+        Alert.alert('Plot Drained', 'You’ve successfully drained the flooded plot.');
         playTimedSound(require('@/assets/sound/water.mp3'));
-
         onUseItem(selectedItem);
-
-        // Start flood checks again
         startFloodCheck(row, col);
         return;
       } else {
-        Alert.alert("Plot Flooded", "This plot is flooded. Use Regadera to drain it first.");
+        Alert.alert('Plot Flooded', 'Use Regadera to drain it first.');
         return;
       }
     }
-    
+
     switch (selectedItem.title) {
       case 'Asarol':
-        console.log('Asarol selected in switch:', selectedItem);
         if (!plot.isPlowed) {
-          setPlots(current => {
-            const newPlots = [...current];
-            newPlots[row] = [...newPlots[row]];
-            newPlots[row][col] = {
-              ...plot,
-              isPlowed: true
-            };
-            return newPlots;
-          });
+          setPlots((current) => updatePlot(current, row, col, { isPlowed: true }));
           playTimedSound(require('@/assets/sound/plow.mp3'));
-          // onUseItem(selectedItem);
           onMissionProgress?.('useTool', { tool: 'Asarol' });
-          savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
+          if (isTutorialActive && tutorialStep === 2) advanceTutorial();
+          savePlantsToFirebase();
         } else {
-          Alert.alert("Already Plowed", "This plot has already been plowed.");
+          Alert.alert('Already Plowed', 'This plot has already been plowed.');
         }
         break;
-  
+
       case 'Regadera':
         if (plot.isPlowed && !plot.isWatered) {
-          setPlots(current => {
-            const newPlots = [...current];
-            newPlots[row] = [...newPlots[row]];
-            newPlots[row][col] = {
-              ...plot,
-              isWatered: true
-            };
-            return newPlots;
-          });
+          setPlots((current) => updatePlot(current, row, col, { isWatered: true }));
           playTimedSound(require('@/assets/sound/water.mp3'));
-          // onUseItem(selectedItem);
           onMissionProgress?.('waterCrop', { row, col });
-          savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
+          if (isTutorialActive && tutorialStep === 4) advanceTutorial();
+          savePlantsToFirebase();
         } else if (plot.plant?.needsWater) {
-          setPlots(current => {
-            const newPlots = [...current];
-            newPlots[row] = [...newPlots[row]];
+          setPlots((current) => {
             if (droughtDecayTimersRef.current[`${row}-${col}`]) {
               clearTimeout(droughtDecayTimersRef.current[`${row}-${col}`]);
               delete droughtDecayTimersRef.current[`${row}-${col}`];
             }
-            newPlots[row][col] = {
-              ...plot,
-              isWatered: true,
-              plant: {
-                ...plot.plant,
-                needsWater: false
-              }
-            };
-            clearPlotTimers(row, col);
-            return newPlots;
+            return updatePlot(current, row, col, { isWatered: true, plant: { ...plot.plant, needsWater: false } });
           });
-          Alert.alert("Plant Watered", "You've saved your plant from drought!");
+          Alert.alert('Plant Watered', 'You’ve saved your plant from drought!');
           onMissionProgress?.('waterCrop', { row, col });
           playTimedSound(require('@/assets/sound/water.mp3'));
           onUseItem(selectedItem);
-        } else if (!plot.isPlowed) {
-          Alert.alert("Not Plowed", "You need to plow this plot first.");
-        } else if (plot.isWatered) {
-          Alert.alert("Already Watered", "This plot has already been watered.");
+        } else {
+          Alert.alert(!plot.isPlowed ? 'Not Plowed' : 'Already Watered', !plot.isPlowed ? 'Plow first.' : 'Already watered.');
         }
         break;
-      
+
       case 'Itak':
         if (plot.plant && plot.plant.stage === 3) {
-          if (plot.plant.hasInfestation && !plot.plant.isRotted) {
-            Alert.alert(
-              "Cannot Harvest", 
-              "This plant has an infestation. Treat it with pesticide before harvesting, or wait for it to rot."
-            );
-            return;
-          }
-          handleHarvest(row, col, plot, () => {
-          // onUseItem(selectedItem);
-          onMissionProgress?.('harvestCrop', { cropType: plot.plant.cropType });
-          savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
-          });
+          handleHarvest(row, col, plot);
         } else {
-          Alert.alert("Not Ready", "This plant is not ready for harvest yet.");
+          Alert.alert('Not Ready', 'This plant isn’t ready for harvest yet.');
         }
         break;
-        
-  
-        case "Chemical Pesticide":
-          if (plot.plant?.hasInfestation) {
-            // Clear decay timer
-            clearPlotTimers(row, col);
 
-            setPlots((current) => {
-              const newPlots = [...current];
-              newPlots[row] = [...newPlots[row]];
-              newPlots[row][col] = {
-                ...newPlots[row][col],
-                plant: {
-                  ...newPlots[row][col].plant!,
-                  hasInfestation: false,
-                },
-              };
-    
-              // Restart infestation check
-              // startInfestationCheck(row, col);
-              return newPlots;
-            });
+      case 'Chemical Pesticide':
+        if (plot.plant?.hasInfestation) {
+          clearPlotTimers(row, col);
+          setPlots((current) => updatePlot(current, row, col, { plant: { ...plot.plant, hasInfestation: false } }));
+          setTimeout(() => startInfestationCheck(row, col), 100);
+          Alert.alert('Success!', 'The infestation has been treated.');
+          playTimedSound(require('@/assets/sound/spray.mp3'));
+          onUseItem(selectedItem);
+          savePlantsToFirebase();
+        } else {
+          Alert.alert(plot.plant ? 'No Infestation' : 'No Plant', plot.plant ? 'No infestation.' : 'No plant here.');
+        }
+        break;
 
-            setTimeout(() => {
-              startInfestationCheck(row, col);
-            }, 100);
-    
-            Alert.alert("Success!", "The infestation has been treated.");
-            playTimedSound(require("@/assets/sound/spray.mp3"));
-            onUseItem(selectedItem);
-            savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
-          } else if (plot.plant) {
-            Alert.alert("No Infestation", "This plant doesn't have an infestation.");
-          } else {
-            Alert.alert("No Plant", "There is no plant in this plot.");
-          }
-          break;
-  
       case 'Synthetic Fertilizer':
       case 'Organic Fertilizer':
         if (plot.plant && !plot.plant.isFertilized) {
-          setPlots(current => {
-            const newPlots = [...current];
-            newPlots[row] = [...newPlots[row]];
-            if (newPlots[row][col].plant) {
-              const currentTime = new Date();
-              const remainingTime = plot.plant.readyAt.getTime() - currentTime.getTime();
-              const newReadyAt = new Date(
-                currentTime.getTime() + (remainingTime * FERTILIZER_GROWTH_MULTIPLIER)
-              );
-              
-              newPlots[row][col] = {
-                ...newPlots[row][col],
-                plant: {
-                  ...newPlots[row][col].plant!,
-                  isFertilized: true,
-                  readyAt: newReadyAt
-                }
-              };
-            }
-            return newPlots;
+          setPlots((current) => {
+            const currentTime = new Date();
+            const remainingTime = plot.plant.readyAt.getTime() - currentTime.getTime();
+            const newReadyAt = new Date(currentTime.getTime() + remainingTime * FERTILIZER_GROWTH_MULTIPLIER);
+            return updatePlot(current, row, col, { plant: { ...plot.plant, isFertilized: true, readyAt: newReadyAt } });
           });
-          Alert.alert('Success!', 'Fertilizer applied! Growth speed increased and harvest value will be doubled.');
+          Alert.alert('Success!', 'Fertilizer applied! Growth speed increased and harvest value doubled.');
           onMissionProgress?.('useFertilizer', { type: selectedItem.title });
           playTimedSound(require('@/assets/sound/fertilizernew.mp3'));
           onUseItem(selectedItem);
-          savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
-        } else if (!plot.plant) {
-          Alert.alert("No Plant", "There is no plant to fertilize in this plot.");
-        } else if (plot.plant.isFertilized) {
-          Alert.alert("Already Fertilized", "This plant has already been fertilized.");
+          if (isTutorialActive && tutorialStep === 9) advanceTutorial();
+          savePlantsToFirebase();
+        } else {
+          Alert.alert(!plot.plant ? 'No Plant' : 'Already Fertilized', !plot.plant ? 'No plant.' : 'Already fertilized.');
         }
         break;
-      
+
       default:
         if (selectedItem.type === 'crop' || selectedItem.type === 'tree') {
-          if (!plot.isPlowed) {
-            Alert.alert('Plot Not Ready', 'Please plow the plot first using Asarol.');
+          if (!plot.isPlowed || !plot.isWatered) {
+            Alert.alert('Plot Not Ready', `Please ${!plot.isPlowed ? 'plow' : 'water'} the plot first.`);
             return;
           }
-          
-          if (!plot.isWatered) {
-            Alert.alert('Plot Not Ready', 'Please water the plot first using Regadera.');
-            return;
-          }
-          
           if (plot.plant) {
-            Alert.alert('Plot Occupied', 'This plot already has a plant growing in it.');
+            Alert.alert('Plot Occupied', 'This plot already has a plant.');
             return;
           }
-      
           const cropType = selectedItem.title as keyof typeof GROWTH_TIMES;
           const newPlant: PlantData = {
             id: Math.random().toString(),
@@ -1094,221 +924,86 @@ export const Taniman: React.FC<TanimanProps> = ({
             isFertilized: false,
             needsWater: false,
           };
-      
-          setPlots(current => {
-            const newPlots = [...current];
-            newPlots[row] = [...newPlots[row]];
-            newPlots[row][col] = {
-              ...plot,
-              plant: newPlant
-            };
-            return newPlots;
-          });
+          setPlots((current) => updatePlot(current, row, col, { plant: newPlant }));
           playTimedSound(require('@/assets/sound/plant.mp3'));
           onUseItem(selectedItem);
           onMissionProgress?.('plantCrop', { cropType: selectedItem.title });
-          savePlantsToFirebase().catch(error => {
-            console.error('Failed to save planted crop to Firebase:', error);
-            Alert.alert('Error', 'Failed to save your planted crop. Progress may not persist.');
-          });
+          if (isTutorialActive && tutorialStep === 6) {
+            advanceTutorial();
+            setPlots((current) => {
+              const newPlots = [...current];
+              newPlots[row][col].plant!.stage = 3;
+              newPlots[row][col].plant!.readyAt = new Date();
+              return newPlots;
+            });
+          }
+          savePlantsToFirebase();
         }
         break;
     }
+    if (isTutorialActive && tutorialSteps[tutorialStep].highlight === 'plot') advanceTutorial();
   };
-  // Add this new function to handle plant decay directly
+
   const handlePlantDecay = (row: number, col: number) => {
-    setPlots(current => {
+    setPlots((current) => {
       const plot = current[row][col];
-      if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) {
-        return current; // No change needed
-      }
-      
-      console.log(`Manual decay triggered for infested plant at [${row},${col}]`);
+      if (!plot.plant || !plot.plant.hasInfestation || plot.plant.isRotted) return current;
       const newPlots = [...current];
       newPlots[row] = [...newPlots[row]];
       newPlots[row][col] = {
         ...newPlots[row][col],
-        plant: {
-          ...newPlots[row][col].plant!,
-          isRotted: true,
-          hasInfestation: false
-        }
+        plant: { ...newPlots[row][col].plant!, isRotted: true, hasInfestation: false },
       };
-      
-      // Alert the user
-      Alert.alert(
-        "Plant Rotted!", 
-        `Your ${plot.plant.cropType} has rotted due to untreated infestation.`
-      );
-      
+      Alert.alert('Plant Rotted!', `Your ${plot.plant.cropType} has rotted due to untreated infestation.`);
       return newPlots;
     });
   };
-  // New function to handle drought damage
+
   const handleDroughtDamage = (row: number, col: number) => {
-    setPlots(current => {
+    setPlots((current) => {
       const plot = current[row][col];
-      if (!plot.plant || !plot.plant.needsWater) {
-        return current; // No change needed
-      }
-      
-      console.log(`Drought damage triggered for plant at [${row},${col}]`);
+      if (!plot.plant || !plot.plant.needsWater) return current;
       const newPlots = [...current];
       newPlots[row] = [...newPlots[row]];
       newPlots[row][col] = {
         ...newPlots[row][col],
-        plant: {
-          ...newPlots[row][col].plant!,
-          isRotted: true,
-          needsWater: false
-        }
+        plant: { ...newPlots[row][col].plant!, isRotted: true, needsWater: false },
       };
-      
-      // Alert the user
-      Alert.alert(
-        "Plant Withered!", 
-        `Your ${plot.plant.cropType} has withered due to drought. Harvest value will be reduced.`
-      );
-      
+      Alert.alert('Plant Withered!', `Your ${plot.plant.cropType} has withered due to drought.`);
       return newPlots;
     });
   };
-   // New function to handle flooding
-   const handleFlood = (row: number, col: number) => {
-    setPlots(current => {
+
+  const handleFlood = (row: number, col: number) => {
+    setPlots((current) => {
       const plot = current[row][col];
-      if (!plot.plant || plot.isFlooded) {
-        return current; // No change needed
-      }
-      
+      if (!plot.plant || plot.isFlooded) return current;
       console.log(`Flood triggered for plot at [${row},${col}]`);
-      
-      // Record plant loss in statistics
-      if (plot.plant) {
-        onUpdateStatistics({ plantsLost: 1 });
-      }
-      
+      if (plot.plant) onUpdateStatistics({ plantsLost: 1 });
       const newPlots = [...current];
       newPlots[row] = [...newPlots[row]];
-      newPlots[row][col] = {
-        isPlowed: false,
-        isWatered: false,
-        isFlooded: true,
-        plant: undefined
-      };
-      
-      // Clear all timers for this plot
+      newPlots[row][col] = { isPlowed: false, isWatered: false, isFlooded: true, plant: undefined };
       clearPlotTimers(row, col);
-      
-      // Alert the user
-      Alert.alert(
-        "Oh No!", 
-        `Your plot has been flooded and all crops were washed away!`
-      );
-      
-      // Play flood sound
+      Alert.alert('Oh No!', 'Your plot has been flooded and all crops were washed away!');
       playTimedSound(require('@/assets/sound/water.mp3'));
-      
       return newPlots;
     });
-    
-    // After a delay, the flood recedes
     setTimeout(() => {
-      setPlots(current => {
-        const newPlots = [...current];
-        newPlots[row] = [...newPlots[row]];
-        newPlots[row][col] = {
-          isPlowed: false,
-          isWatered: false,
-          isFlooded: false,
-          plant: undefined
-        };
-        return newPlots;
-      });
-    }, 10000); // Flood recedes after 10 seconds
+      setPlots((current) => updatePlot(current, row, col, { isPlowed: false, isWatered: false, isFlooded: false, plant: undefined }));
+    }, 10000);
   };
+
   const getPlantImage = (plant: PlantData) => {
-    if (plant.isRotted) {
-      return require('@/assets/images/rotten.png');
-    }
-    
-    if (plant.hasInfestation) {
-      return require('@/assets/images/infe.png');
-    }
-
-    if (plant.needsWater) {
-      return require('@/assets/images/drought.png');
-    }
-    
+    if (plant.isRotted) return require('@/assets/images/rotten.png');
+    if (plant.hasInfestation) return require('@/assets/images/infe.png');
+    if (plant.needsWater) return require('@/assets/images/drought.png');
     switch (plant.stage) {
-      case 0:
-        return require('@/assets/images/seeds.png');
-      case 1:
-        return require('@/assets/images/sprout.png');
+      case 0: return require('@/assets/images/seeds.png');
+      case 1: return require('@/assets/images/sprout.png');
       case 2:
-      case 3:
-        return plant.image;
-      default: 
-        return plant.image;
+      case 3: return plant.image;
+      default: return plant.image;
     }
-  };
-  const testInfestation = (row: number, col: number) => {
-
-    setPlots(current => {
-      const newPlots = [...current];
-      newPlots[row] = [...newPlots[row]];
-
-      if (newPlots[row][col].plant) {
-        newPlots[row][col] = {
-          ...newPlots[row][col],
-          plant: {
-            ...newPlots[row][col].plant!,
-            hasInfestation: true
-          }
-        };
-        // Start decay timer
-        startDecayTimer(row, col);
-        console.log('🐛 FORCED Infestation:', {
-          row, 
-          col, 
-          infestationStatus: newPlots[row][col].plant.hasInfestation
-        });
-        Alert.alert('Infestation Forced', 'Infestation manually set to true');
-      }
-      return newPlots;
-    });
-  };
-  // test drought
-  const testDrought = (row: number, col: number) => {
-    setPlots(current => {
-      const newPlots = [...current];
-      newPlots[row] = [...newPlots[row]];
-
-      if (newPlots[row][col].plant) {
-        newPlots[row][col] = {
-          ...newPlots[row][col],
-          isWatered: false,
-          plant: {
-            ...newPlots[row][col].plant!,
-            needsWater: true
-          }
-        };
-        // Start drought decay timer
-        startDroughtDecayTimer(row, col);
-        console.log('🏜️ FORCED Drought:', {
-          row, 
-          col, 
-          droughtStatus: newPlots[row][col].plant.needsWater
-        });
-        Alert.alert('Drought Forced', 'Drought manually set to true');
-      }
-      return newPlots;
-    });
-  };
-  // test flood 
-  const testFlood = (row: number, col: number) => {
-    handleFlood(row, col);
-    Alert.alert('Flood Forced', 'Flood manually triggered');
   };
 
   return (
@@ -1321,29 +1016,25 @@ export const Taniman: React.FC<TanimanProps> = ({
                 key={colIndex}
                 onPress={() => handlePlotPress(rowIndex, colIndex)}
                 className={`w-16 h-16 rounded-lg overflow-hidden border-4 ${
-                  plot.isPlowed 
-                    ? 'border-amber-800 bg-amber-700' 
-                    : 'border-green-800 bg-green-700'
+                  plot.isPlowed ? 'border-amber-800 bg-amber-700' : 'border-green-800 bg-green-700'
                 } ${
-                  plot.isWatered 
-                    ? 'border-amber-800 bg-amber-800' 
-                    : 'opacity-500'
+                  plot.isWatered ? 'border-amber-800 bg-amber-800' : 'opacity-500'
+                } ${
+                  isTutorialActive && tutorialSteps[tutorialStep].highlight === 'plot' && rowIndex === 0 && colIndex === 0
+                    ? 'border-4 border-yellow-500'
+                    : ''
                 }`}
               >
                 {plot.plant && (
                   <View className="w-full h-full items-center justify-center">
-                    <Image
-                      source={getPlantImage(plot.plant)}
-                      className="w[34px] h-[34px]"
-                      resizeMode="contain"
-                    />
+                    <Image source={getPlantImage(plot.plant)} className="w-[34px] h-[34px]" resizeMode="contain" />
                     {plot.plant.stage === 3 && (
                       <View className="absolute top-0 right-0 bg-green-500 rounded-bl-lg p-[1px]">
                         <Text className="text-[8px]">✓</Text>
                       </View>
                     )}
                     {plot.plant.hasInfestation && !plot.plant.isRotted && (
-                      <View className="absolute bottom-0 left-0 bg-red-500 rounded-br-lg ">
+                      <View className="absolute bottom-0 left-0 bg-red-500 rounded-br-lg">
                         <Text className="text-[8px]">🐛</Text>
                       </View>
                     )}
@@ -1362,8 +1053,7 @@ export const Taniman: React.FC<TanimanProps> = ({
                         <Text className="text-[7px]">⚡</Text>
                       </View>
                     )}
-                    {/* Display Timers */}
-                    <View className="absolute bottom-0 left-0 right-0 ">
+                    <View className="absolute bottom-0 left-0 right-0">
                       {plot.plant.stage < 3 && (
                         <Text className="text-black text-[7px] font-medium text-right">
                           {formatTime(timers.growth[`${rowIndex}-${colIndex}`] / 1000)}
@@ -1387,10 +1077,45 @@ export const Taniman: React.FC<TanimanProps> = ({
           </View>
         ))}
       </View>
+
       {selectedItem && (
-        <View className="absolute top-[-5px] right-[300px] bg-white/80 p-2 rounded-lg">
+        <View className={`absolute top-[-5px] right-[300px] bg-white/80 p-2 rounded-lg ${
+          isTutorialActive && (
+            (tutorialStep === 1 && selectedItem.title !== 'Asarol') ||
+            (tutorialStep === 3 && selectedItem.title !== 'Regadera') ||
+            (tutorialStep === 5 && selectedItem.title !== 'Sibuyas') ||
+            (tutorialStep === 8 && selectedItem.title !== 'Synthetic Fertilizer') ||
+            (tutorialStep === 10 && selectedItem.title !== 'Itak')
+          ) ? 'border-4 border-yellow-500' : ''
+        }`}>
           <Text className="text-sm font-medium">Selected: {selectedItem.title}</Text>
+          {isTutorialActive && tutorialStep === 1 && selectedItem.title !== 'Asarol' && (
+            <Text className="text-xs text-yellow-700">Select "Asarol" to continue.</Text>
+          )}
+          {isTutorialActive && tutorialStep === 3 && selectedItem.title !== 'Regadera' && (
+            <Text className="text-xs text-yellow-700">Select "Regadera" to continue.</Text>
+          )}
+          {isTutorialActive && tutorialStep === 5 && selectedItem.title !== 'Sibuyas' && (
+            <Text className="text-xs text-yellow-700">Select a seed (e.g., "Sibuyas") to continue.</Text>
+          )}
+          {isTutorialActive && tutorialStep === 8 && selectedItem.title !== 'Synthetic Fertilizer' && (
+            <Text className="text-xs text-yellow-700">Select "Synthetic Fertilizer" to continue.</Text>
+          )}
+          {isTutorialActive && tutorialStep === 10 && selectedItem.title !== 'Itak' && (
+            <Text className="text-xs text-yellow-700">Select "Itak" to continue.</Text>
+          )}
         </View>
+      )}
+
+      {isTutorialActive && tutorialSteps[tutorialStep].message && (
+        <TutorialOverlay
+          message={tutorialSteps[tutorialStep].message}
+          onNext={advanceTutorial}
+          onClose={() => {
+            setIsTutorialActive(false);
+            markTutorialCompleted();
+          }}
+        />
       )}
     </View>
   );
