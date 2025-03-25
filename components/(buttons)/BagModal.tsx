@@ -35,7 +35,6 @@ export const BagModal = ({
   onAddToInventory
 }: BagModalProps) => {
 
-  // Ensure inventory is always an array, even if undefined or null
   const safeInventory = Array.isArray(inventory) ? inventory : [];
   
   useEffect(() => {
@@ -50,6 +49,7 @@ export const BagModal = ({
   const handleItemUse = (item: InventoryItem) => {
     onUseItem(item);
   };
+
   useEffect(() => {
     console.log('BagModal - Current inventory:', inventory);
   }, [inventory]);
@@ -92,43 +92,41 @@ export const BagModal = ({
     onClose();
     
     // For consumable items, ONLY check if they're valid to use, but don't consume yet
-    const nonConsumableTools = [''];
+    const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
     if (!nonConsumableTools.includes(item.title)) {
-      // Determine what the item does first
-      if (item.title === 'Fertilizer' || item.title === 'Organic Fertilizer') {
-        // If there's no currently selected plot with a plant, alert the user
-        const hasActivePlant = plots.some(row => 
-          row.some(plot => plot.plant && !plot.plant.isFertilized)
-        );
-        
-        if (!hasActivePlant) {
-          return; // Don't remove the item if it can't be used
+      // Only remove consumable items
+      const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
+      if (!nonConsumableTools.includes(item.title)) {
+        // Determine what the item does first
+        if (item.title === 'Fertilizer' || item.title === 'Organic Fertilizer') {
+          const hasActivePlant = plots.some(row => 
+            row.some(plot => plot.plant && !plot.plant.isFertilized)
+          );
+          
+          if (!hasActivePlant) {
+            return; // Don't remove the item if it can't be used
+          }
+          
+          Alert.alert(
+            "Apply Fertilizer",
+            "Select a plot with a plant to apply fertilizer.",
+            [{ text: "OK" }]
+          );
+        } else if (item.type === 'crop' || item.type === 'tree') {
+          const hasAvailablePlot = plots.some(row => 
+            row.some(plot => plot.isPlowed && plot.isWatered && !plot.plant)
+          );
+          
+          if (!hasAvailablePlot) {
+            return;
+          }
+          
+          Alert.alert(
+            "Plant Seeds",
+            "Select a plowed and watered plot to plant these seeds.",
+            [{ text: "OK" }]
+          );
         }
-        
-        Alert.alert(
-          "Apply Fertilizer",
-          "Select a plot with a plant to apply fertilizer.",
-          [
-            { text: "OK" }
-          ]
-        );
-      } else if (item.type === 'crop' || item.type === 'tree') {
-        // If there's no plowed and watered plot available, alert the user
-        const hasAvailablePlot = plots.some(row => 
-          row.some(plot => plot.isPlowed && plot.isWatered && !plot.plant)
-        );
-        
-        if (!hasAvailablePlot) {
-          return;
-        }
-        
-        Alert.alert(
-          "Plant Seeds",
-          "Select a plowed and watered plot to plant these seeds.",
-          [
-            { text: "OK" }
-          ]
-        );
       }
     }
   };

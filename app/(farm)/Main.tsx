@@ -64,6 +64,7 @@ interface MissionProgress {
   const [rottedCrops, setRottedCrops] = useState<InventoryItem[]>([]);
   const [composeModalVisible, setComposeModalVisible] = useState(false);
   const [decomposedItems, setDecomposedItems] = useState<InventoryItem[]>([]);
+  const [purchasedTools, setPurchasedTools] = useState<string[]>([]);
   
   const [statistics, setStatistics] = useState({
     plantsGrown: 0,
@@ -77,16 +78,20 @@ interface MissionProgress {
     harvestedCrops: number;
     usedTools: { [key: string]: number };
     usedFertilizers: { [key: string]: number };
+    soldCrops: number;              
+    soldTrees: number;             
+    organicFertilizersCreated: number;
   }>({
     wateredCrops: 0,
     plantedCrops: 0,
     harvestedCrops: 0,
     usedTools: {},
     usedFertilizers: {},
+    soldCrops: 0,                  
+    soldTrees: 0,                   
+    organicFertilizersCreated: 0,
   });
-
   
-  // Add plots state - initialize with a 3x3 grid
   const [plots, setPlots] = useState<PlotStatus[][]>(
     Array(3).fill(null).map(() => 
       Array(3).fill(null).map(() => ({
@@ -96,6 +101,7 @@ interface MissionProgress {
       }))
     )
   );
+
   const [modals, setModals] = useState({
     shop: false,
     bag: false,
@@ -145,7 +151,7 @@ interface MissionProgress {
           break;
         case 'plantCrop':
           newProgress.plantedCrops += 1;
-          if (details.cropType.includes('Ornamental')) newProgress.plantedCrops += 1; // Adjust for specific missions
+          if (details.cropType.includes('Ornamental')) newProgress.plantedCrops += 1;
           break;
         case 'harvestCrop':
           newProgress.harvestedCrops += 1;
@@ -156,6 +162,15 @@ interface MissionProgress {
         case 'useFertilizer':
           newProgress.usedFertilizers = newProgress.usedFertilizers || {};
           newProgress.usedFertilizers[details.type] = (newProgress.usedFertilizers[details.type] || 0) + 1;
+          break;
+        case 'sellCrop':
+          newProgress.soldCrops = (newProgress.soldCrops || 0) + 1;
+          break;
+        case 'sellTree':
+          newProgress.soldTrees = (newProgress.soldTrees || 0) + 1;
+          break;
+        case 'createOrganicFertilizer':
+          newProgress.organicFertilizersCreated = (newProgress.organicFertilizersCreated || 0) + 1;
           break;
       }
 
@@ -177,8 +192,13 @@ interface MissionProgress {
           isComplete = (newProgress.usedFertilizers['Organic Fertilizer'] || 0) >= 1;
         } else if (mission.title === 'Mag tanim ng tree') {
           isComplete = newProgress.plantedCrops >= 1 && details.cropType === 'Mangga'; 
+        }else if (mission.title === 'Mag Benta ng Crops') {
+          isComplete = (newProgress.soldCrops || 0) >= 1;
+        } else if (mission.title === 'Mag Benta ng Tree') {
+          isComplete = (newProgress.soldTrees || 0) >= 1;
+        } else if (mission.title === 'Gumawa ng Organic Fertilizer') {
+          isComplete = (newProgress.organicFertilizersCreated || 0) >= 1;
         }
-        // Jukabg ay amag benta ng resh plants at mag sell ng prutas at gumawa ng organic 
         return isComplete ? { ...mission, completed: true } : mission;
       });
 
@@ -210,7 +230,6 @@ interface MissionProgress {
     loadDecomposedItems();
   }, []);
 
-  // Add this anywhere in your Main component with the other function definitions
   const verifyInventoryInDatabase = async () => {
     if (!params.uid) return;
     
@@ -232,7 +251,6 @@ interface MissionProgress {
     }
   };
 
-  // Create a function to save decomposed items
   const saveDecomposedItems = async (items: InventoryItem[]) => {
     try {
       await AsyncStorage.setItem('decomposedItems', JSON.stringify(items));
@@ -271,14 +289,11 @@ interface MissionProgress {
       if (snapshot.exists()) {
         const data = snapshot.val();
         
-        // Handle inventory specifically
         if (data.inventory) {
-          // If inventory is an object, convert it to an array
           let inventoryArray = Array.isArray(data.inventory) 
             ? data.inventory 
             : Object.values(data.inventory);
           
-          // Remove any null values
           inventoryArray = inventoryArray.filter(item => item !== null);
           
           console.log('Inventory updated from Firebase:', {
@@ -288,7 +303,6 @@ interface MissionProgress {
           
           setInventory(inventoryArray);
         } else {
-          // If there's no inventory in the data, set it to an empty array
           setInventory([]);
         }
         
@@ -300,7 +314,6 @@ interface MissionProgress {
     return () => unsubscribe();
   }, [params.uid]);
 
-  // FIX 1: Improved inventory synchronization with real-time database
   useEffect(() => {
     if (!params.uid) return;
     
@@ -331,7 +344,32 @@ interface MissionProgress {
     return () => unsubscribe();
   }, [params.uid]);
 
-  // FIX 2: Keep selectedItem in sync with inventory changes
+  useEffect(() => {
+    if (!params.uid) return;
+
+    const loadUserData = async () => {
+      try {
+        const userRef = ref(Firebase_Database, `users/${params.uid}`);
+        const snapshot = await get(userRef);
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          setPurchasedTools(data.purchasedTools || []);
+          setMissions(Array.isArray(data.missions) ? data.missions : INITIAL_GAME_STATE.missions);
+          setMissionProgress(data.missionProgress || {
+            wateredCrops: 0,
+            plantedCrops: 0,
+            harvestedCrops: 0,
+            usedTools: {},
+            usedFertilizers: {},
+          });
+        }
+      } catch (error) {
+        console.error("Error loading user data:", error);
+      }
+    };
+    loadUserData();
+  }, [params.uid]);
+
   useEffect(() => {
     if (selectedItem && !inventory.find(item => item.id === selectedItem.id)) {
       // The selected item has been removed from inventory
@@ -339,7 +377,6 @@ interface MissionProgress {
     }
   }, [inventory, selectedItem]);
 
-  // FIX 3: Improved useEffect for gameData initialization
   useEffect(() => {
     if (gameData) {
       if (gameData.inventory) {
@@ -357,7 +394,6 @@ interface MissionProgress {
     }
   }, [gameData]);
 
-  // Function to handle removing item from inventory
   const handleRemoveItem = async (itemId: string) => {
     if (!params.uid) return;
     try {
@@ -369,82 +405,53 @@ interface MissionProgress {
     }
   };
 
-  // Function to handle adding items to inventory - with improved error handling
   const handleAddToInventory = async (item: InventoryItem) => {
     if (!params.uid) {
       Alert.alert("Error", "User ID is missing");
       return;
     }
-  
     try {
-      console.log(`Adding item to inventory:`, {
-        item: JSON.stringify(item, null, 2),
-        currentInventoryLength: inventory?.length || 0
-      });
-  
-      // Create a copy of the current inventory array or initialize if it doesn't exist
-      const currentInventory = Array.isArray(inventory) ? [...inventory] : [];
-      
-      // Check if an item with the same ID already exists
+      const currentInventory = Array.isArray(inventory) ? [...inventory] : [];      
       const existingItemIndex = currentInventory.findIndex(i => i.id === item.id);
       
-      // If item exists, update it, otherwise add it
       if (existingItemIndex >= 0) {
         currentInventory[existingItemIndex] = item;
-        console.log('Updated existing item in inventory:', item.id);
       } else {
         currentInventory.push(item);
-        console.log('Added new item to inventory:', item.id);
-      }
-  
-      // Update local state first to improve UI responsiveness
-      setInventory(currentInventory);
-  
-      // Then update Firebase
+      }  
+      setInventory(currentInventory);  
       const userRef = ref(Firebase_Database, `users/${params.uid}`);
       await update(userRef, {
         inventory: currentInventory
-      });
-  
-      console.log('Firebase updated with new inventory:', currentInventory.length);
+      });  
     } catch (error) {
       console.error('Error adding item to inventory:', error);
       Alert.alert("Error", "Failed to add item to inventory");
     }
   };
 
-
-  const handleUseItem = (usedItem: InventoryItem) => { 
+  const handleUseItem = (usedItem: InventoryItem) => {
     console.log('Using Item: ', usedItem.title);
-    
-    // Create a copy of the current inventory
-    const updatedInventory = [...inventory];
-    
-    // Find the item in the inventory
-    const itemIndex = updatedInventory.findIndex(item => item.id === usedItem.id);
-    
-    if (itemIndex !== -1) {
-      // If quantity property exists and is greater than 1, decrement it
-      if (updatedInventory[itemIndex].quantity && updatedInventory[itemIndex].quantity > 1) {
-        updatedInventory[itemIndex].quantity -= 1;
-      } else {
-        // Otherwise, remove the item
-        updatedInventory.splice(itemIndex, 1);
-      }
-      
-      // Update state and Firebase
-      setInventory(updatedInventory);
-      
-      if (params.uid) {
-        const userRef = ref(Firebase_Database, `users/${params.uid}`);
-        update(userRef, {
-          inventory: updatedInventory
-        });
+    const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];    
+    if (!nonConsumableTools.includes(usedItem.title)) {
+      const updatedInventory = [...inventory];
+      const itemIndex = updatedInventory.findIndex(item => item.id === usedItem.id);
+      if (itemIndex !== -1) {
+        if (updatedInventory[itemIndex].quantity && updatedInventory[itemIndex].quantity > 1) {
+          updatedInventory[itemIndex].quantity -= 1;
+        } else {
+          updatedInventory.splice(itemIndex, 1);
+        }
+        setInventory(updatedInventory);
+        if (params.uid) {
+          update(ref(Firebase_Database, `users/${params.uid}`), {
+            inventory: updatedInventory
+          });
+        }
       }
     }
   };
   
-
   const handleUpdateInventory = async (newInventory: InventoryItem[]) => {
     setInventory(newInventory);
     if (params.uid) {
@@ -464,6 +471,11 @@ interface MissionProgress {
       await handleUpdateMoney(moneyEarned);
       await handleRemoveItem(item.id);
       await handleUpdateStatistics({ moneyEarned });
+      if (item.type === 'crop') {
+        handleMissionProgress('sellCrop', { item });
+      } else if (item.type === 'tree') {
+        handleMissionProgress('sellTree', { item });
+      }
       Alert.alert("Success", `Sold ${item.title} for ${moneyEarned} coins!`);
     } catch (error) {
       console.error('Error selling item:', error);
@@ -471,7 +483,6 @@ interface MissionProgress {
     }
   };
 
-  // plot state saving
   const handleSavePlotsState = async () => {
     if (!params.uid) {
       console.log("Cannot save plots state: User ID is missing");
@@ -597,7 +608,6 @@ interface MissionProgress {
     return () => clearInterval(saveInterval);
   }, [plots]);
   
-  // Make sure to call handleSavePlotsState when component unmounts
   useEffect(() => {
     return () => {
       handleSavePlotsState();
@@ -614,8 +624,6 @@ interface MissionProgress {
       ScreenOrientation.unlockAsync();
     };
   }, []);
-
-    
 
   const playSound = async (soundFile: number) => {
     try {
@@ -648,7 +656,6 @@ interface MissionProgress {
       console.error('Sign out error:', error);
     }
   };
-
 
   const handleUpdateMoney = async (amount: number) => {
     if (!params.uid) return;
@@ -712,35 +719,45 @@ interface MissionProgress {
     });
   }
 };
-useEffect(() => {
-  if (params.uid) {
-    // Refresh inventory data from Firebase
-    const userRef = ref(Firebase_Database, `users/${params.uid}`);
-    get(userRef).then((snapshot) => {
-      if (snapshot.exists()) {
-        const data = snapshot.val();
-        if (data.inventory) {
-          // Convert to array if needed
-          const inventoryArray = Array.isArray(data.inventory) 
-            ? data.inventory 
-            : Object.values(data.inventory);
-          
-          // Filter out null values
-          const filteredInventory = inventoryArray.filter(item => item !== null);
-          
-          setInventory(filteredInventory);
-          console.log('Inventory refreshed from Firebase:', filteredInventory.length);
+
+  useEffect(() => {
+    if (params.uid) {
+      // Refresh inventory data from Firebase
+      const userRef = ref(Firebase_Database, `users/${params.uid}`);
+      get(userRef).then((snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          if (data.inventory) {
+            // Convert to array if needed
+            const inventoryArray = Array.isArray(data.inventory) 
+              ? data.inventory 
+              : Object.values(data.inventory);
+            
+            // Filter out null values
+            const filteredInventory = inventoryArray.filter(item => item !== null);
+            
+            setInventory(filteredInventory);
+            console.log('Inventory refreshed from Firebase:', filteredInventory.length);
+          }
         }
-      }
-    }).catch((error) => {
-      console.error('Error refreshing inventory:', error);
-    });
-  }
-}, [selectedItem]);
+      }).catch((error) => {
+        console.error('Error refreshing inventory:', error);
+      });
+    }
+  }, [selectedItem]);
 
   const handleSelectItem = (item: InventoryItem | null) => {
     console.log("Selected item in parent:", item);
     setSelectedItem(item);
+};
+
+  const handleUpdatePurchasedTools = async (newPurchasedTools: string[]) => {
+    setPurchasedTools(newPurchasedTools);
+    if (params.uid) {
+      await update(ref(Firebase_Database, `users/${params.uid}`), {
+        purchasedTools: newPurchasedTools,
+      });
+    }
 };
 
   if (loading) {
@@ -858,6 +875,8 @@ useEffect(() => {
           uid={params.uid as string}
           userMoney={userMoney}
           onPurchase={() => {/* Refresh game data handled by useGameData */}}
+          purchasedTools={purchasedTools}
+          onUpdatePurchasedTools={handleUpdatePurchasedTools}
         />
 
         <DecomposeModal
@@ -874,7 +893,7 @@ useEffect(() => {
           onLoadNormalItems={setNormalItems}
           onLoadInventory={(items) => setInventory(items)}
           verifyInventory={verifyInventoryInDatabase}
-          // onUpdateStatistics={handleUpdateStatistics}
+          onMissionProgress={handleMissionProgress}
         />
 
         <BagModal

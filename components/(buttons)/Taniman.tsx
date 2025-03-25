@@ -875,6 +875,7 @@ export const Taniman: React.FC<TanimanProps> = ({
     if (!selectedItem) return;
 
     const plot = plots[row][col];
+    const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
     if (plot.isFlooded) {
       if (selectedItem.title === 'Regadera') {
         setPlots(current => {
@@ -917,7 +918,7 @@ export const Taniman: React.FC<TanimanProps> = ({
             return newPlots;
           });
           playTimedSound(require('@/assets/sound/plow.mp3'));
-          onUseItem(selectedItem);
+          // onUseItem(selectedItem);
           onMissionProgress?.('useTool', { tool: 'Asarol' });
           savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
         } else {
@@ -937,7 +938,7 @@ export const Taniman: React.FC<TanimanProps> = ({
             return newPlots;
           });
           playTimedSound(require('@/assets/sound/water.mp3'));
-          onUseItem(selectedItem);
+          // onUseItem(selectedItem);
           onMissionProgress?.('waterCrop', { row, col });
           savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
         } else if (plot.plant?.needsWater) {
@@ -980,7 +981,7 @@ export const Taniman: React.FC<TanimanProps> = ({
             return;
           }
           handleHarvest(row, col, plot, () => {
-          onUseItem(selectedItem);
+          // onUseItem(selectedItem);
           onMissionProgress?.('harvestCrop', { cropType: plot.plant.cropType });
           savePlantsToFirebase().catch(error => console.error('Failed to save plowed state:', error));
           });

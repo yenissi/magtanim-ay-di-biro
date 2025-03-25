@@ -19,6 +19,7 @@ interface DecomposeModalProps {
   inventory?: InventoryItem[]; // Add this line
   onLoadInventory?: (items: InventoryItem[]) => void;
   verifyInventory?: () => Promise<void>;
+  onMissionProgress?: (action: string, details: any) => void;
 }
 
 export const DecomposeModal: React.FC<DecomposeModalProps> = ({
@@ -34,6 +35,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
   onLoadInventory,
   verifyInventory,
   decomposedItems,
+  onMissionProgress,
 }) => {
   const [selectedRottedItems, setSelectedRottedItems] = useState<string[]>([]);
   const [selectedNormalItems, setSelectedNormalItems] = useState<string[]>([]);
@@ -48,16 +50,12 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
   const [activeTab, setActiveTab] = useState<'rotted' | 'normal'>('rotted');
   const [isUserSignedIn, setIsUserSignedIn] = useState(false);
 
-  // Check if user is signed in
   useEffect(() => {
     const checkAuth = () => {
       const userId = Firebase_Auth.currentUser?.uid;
       setIsUserSignedIn(!!userId);
     };
-    
-    checkAuth();
-    
-    // Set up auth state listener
+    checkAuth();    
     const unsubscribe = Firebase_Auth.onAuthStateChanged((user) => {
       setIsUserSignedIn(!!user);
     });
@@ -65,7 +63,6 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
     return () => unsubscribe();
   }, []);
 
-  // Load items from Firebase and set up listeners
   useEffect(() => {
     const userId = Firebase_Auth.currentUser?.uid;
     if (!userId) {
@@ -73,10 +70,9 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
       if (onLoadRottedItems) onLoadRottedItems([]);
       if (onLoadNormalItems) onLoadNormalItems([]);
       if (onLoadInventory) onLoadInventory([]); 
-      return; // Early return if user is not signed in
+      return; 
     }
 
-    // Load statistics
     const loadStatistics = async () => {
       try {
         const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
@@ -139,7 +135,6 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
     };
   }, []);
 
-  // Calculate potential compost value whenever selected rotted items change
   useEffect(() => {
     const totalValue = selectedRottedItems.reduce((total, itemId) => {
       const item = rottedItems.find((item) => item.id === itemId);
@@ -149,7 +144,6 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
     setCompostAmount(totalValue);
   }, [selectedRottedItems, rottedItems]);
 
-  // Calculate potential sell value whenever selected normal items change
   useEffect(() => {
     const totalValue = selectedNormalItems.reduce((total, itemId) => {
       const item = normalItems.find((item) => item.id === itemId);
@@ -171,8 +165,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
     );
   };
 
-  // Handle selling normal crops
-const handleSellNormalCrops = async () => {
+  const handleSellNormalCrops = async () => {
   if (selectedNormalItems.length === 0) {
     Alert.alert('Selection Empty', 'Please select items to sell.');
     return;
@@ -240,7 +233,6 @@ const handleSellNormalCrops = async () => {
   }
 };
 
-  // Handle decomposing rotted crops into fertilizer
   const handleDecompose = async () => {
     if (selectedRottedItems.length < REQUIRED_ITEMS_FOR_FERTILIZER) {
       Alert.alert(
@@ -301,18 +293,17 @@ const handleSellNormalCrops = async () => {
         }
         
       } else {
-        // If no user, update local state directly
-        selectedRottedItems.forEach(itemId => onRemoveItem(itemId));
-        
-        // Add fertilizers to local state
+        selectedRottedItems.forEach(itemId => onRemoveItem(itemId));        
         fertilizers.forEach(fert => {
           onAddToInventory(fert);
         });
       }
-  
-      // Reset selection
+      if (onMissionProgress && fertilizerCount > 0) {
+        for (let i = 0; i < fertilizerCount; i++) {
+          onMissionProgress('createOrganicFertilizer', {});
+        }
+      }  
       setSelectedRottedItems([]);
-  
       Alert.alert(
         'Composting Complete!',
         `Converted ${selectedItemsCount} rotted items into ${fertilizerCount} fertilizer.`
@@ -342,7 +333,6 @@ const handleSellNormalCrops = async () => {
   const canCreateFertilizer = selectedRottedItems.length >= REQUIRED_ITEMS_FOR_FERTILIZER;
   const fertilizerAmount = Math.floor(selectedRottedItems.length / REQUIRED_ITEMS_FOR_FERTILIZER);
 
-  // Function to handle user authentication requirement
   const handleSellWithWarning = () => {
     const userId = Firebase_Auth.currentUser?.uid;
     if (!userId && selectedNormalItems.length > 0) {
@@ -426,11 +416,6 @@ const handleSellNormalCrops = async () => {
                 <Text className="font-semibold text-brown-800">
                   Rotted Items ({rottedItems.length})
                 </Text>
-                {/* <TouchableOpacity onPress={handleSelectAllRotted} className="bg-brown-500 px-3 py-1 rounded">
-                  <Text className="text-white text-xs">
-                    {selectedRottedItems.length === rottedItems.length ? 'Deselect All' : 'Select All'}
-                  </Text>
-                </TouchableOpacity> */}
               </View>
 
               {rottedItems.length > 0 ? (
@@ -488,11 +473,6 @@ const handleSellNormalCrops = async () => {
                 <Text className="font-semibold text-brown-800">
                   Fresh Crops ({normalItems.length})
                 </Text>
-                {/* <TouchableOpacity onPress={handleSelectAllNormal} className="bg-brown-500 px-3 py-1 rounded">
-                  <Text className="text-white text-xs">
-                    {selectedNormalItems.length === normalItems.length ? 'Deselect All' : 'Select All'}
-                  </Text>
-                </TouchableOpacity> */}
               </View>
 
               {normalItems.length > 0 ? (

@@ -10,6 +10,8 @@ interface ShopModalProps {
   uid: string;
   userMoney: number;
   onPurchase: () => void;
+  purchasedTools?: string[];
+  onUpdatePurchasedTools?: (tools: string[]) => void;
 }
 
 interface FlipCardProps {
@@ -137,45 +139,65 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
 
 const TABS = ['All', 'Tool', 'Crop', 'Tree'];
 
-export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: ShopModalProps) => {
+export const ShopModal = ({ 
+  visible, 
+  onClose, 
+  uid, 
+  userMoney, 
+  onPurchase, 
+  purchasedTools = [],
+  onUpdatePurchasedTools 
+}: ShopModalProps) => {
 
   const [selectedTab, setSelectedTab] = useState('All');
+  const oneTimeTools = ['Itak', 'Regadera', 'Asarol'];
 
-  const displayItems = selectedTab === 'All' 
-  ? SHOP_ITEMS 
-  : SHOP_ITEMS.filter(item => item.type.toLowerCase() === selectedTab.toLowerCase());
+  const displayItems = selectedTab === 'All'
+    ? SHOP_ITEMS.filter(item => !oneTimeTools.includes(item.title) || !purchasedTools.includes(item.title))
+    : SHOP_ITEMS.filter(item => 
+        item.type.toLowerCase() === selectedTab.toLowerCase() && 
+        (!oneTimeTools.includes(item.title) || !purchasedTools.includes(item.title))
+      );
 
     const handlePurchase = async (itemId: number, price: number) => {
       if (userMoney < price) {
         Alert.alert("Insufficient Funds", "You don't have enough money for this purchase.");
         return;
       }
-
       const db = getDatabase();
       const userRef = ref(db, `users/${uid}`);
-      
       try {
         const snapshot = await get(userRef);
         if (!snapshot.exists()) return;
     
         const userData = snapshot.val();
         const inventory = Array.isArray(userData.inventory) ? userData.inventory : [];
+        const item = SHOP_ITEMS.find(item => item.id === itemId);
         
         // Find the item to purchase
-        const item = SHOP_ITEMS.find(item => item.id === itemId);
         if (!item) {
           console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
           return;
         }
-
-        const existingItemIndex = inventory.findIndex(item => item.id === itemId);
-    
+        const existingItemIndex = inventory.findIndex(i => i.id === itemId); 
         let updatedInventory;
+
+        if (oneTimeTools.includes(item.title)) {
+        // For one-time purchase tools
+        updatedInventory = [...inventory, { ...item, quantity: 1, isOneTime: true }];
+        const newPurchasedTools = [...purchasedTools, item.title];
+        onUpdatePurchasedTools?.(newPurchasedTools);
+        
+        await update(userRef, {
+          money: userData.money - price,
+          inventory: updatedInventory,
+          purchasedTools: newPurchasedTools // Store in Firebase
+        });
+      } else {
+        // Existing logic for other items
         if (existingItemIndex !== -1) {
-          // Item exists, increment quantity
           updatedInventory = [...inventory];
           if (!updatedInventory[existingItemIndex].quantity) {
-            // If quantity property doesn't exist yet, initialize it to 1
             updatedInventory[existingItemIndex] = {
               ...updatedInventory[existingItemIndex],
               quantity: 1
@@ -183,23 +205,20 @@ export const ShopModal = ({ visible, onClose, uid, userMoney, onPurchase }: Shop
           }
           updatedInventory[existingItemIndex].quantity += 1;
         } else {
-          // Item doesn't exist, add it with quantity 1
-          updatedInventory = [...inventory, {...item, quantity: 1}];
-        }
-
-    
+          updatedInventory = [...inventory, { ...item, quantity: 1 }];
+        } 
         await update(userRef, {
           money: userData.money - price,
           inventory: updatedInventory,
         });
-        
-        Alert.alert("Success", `${item.title} purchased successfully!`);
-        onPurchase();
-      } catch (error) {
-        console.error("Purchase error:", error);
-        Alert.alert("Error", "Failed to complete purchase. Please try again.");
       }
-    };
+      Alert.alert("Success", `${item.title} purchased successfully!`);
+      onPurchase();
+    } catch (error) {
+      console.error("Purchase error:", error);
+      Alert.alert("Error", "Failed to complete purchase. Please try again.");
+    }
+  };
 
   return (
     <Modal visible={visible} transparent animationType="fade">
