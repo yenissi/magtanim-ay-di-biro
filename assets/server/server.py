@@ -99,14 +99,11 @@ def process_answer():
     # Get input data from the request
     data = request.json
     mission_id = data.get("mission_id")
-    
-    # Initialize the user's answer as a String variable
     user_answer = data.get("answer", "")
     answer = sanitize_input(user_answer)  # Sanitize the input
     
-    # Input validation
-    if len(answer) <= 1:
-        return jsonify({
+    if len(answer) <= 1 or len(answer.split()) < 5:
+        response = {
             "mission_id": mission_id,
             "error": "Answer too short",
             "detailed_scores": {
@@ -115,13 +112,15 @@ def process_answer():
                 "Use_of_Example_Data_Score": 0.0,
                 "Average_Score": 0.0
             }
-        }), 400
+        }
+        print("Response:", response)  # Log the response
+        return jsonify(response), 400
     
     # Check word count
     word_count = len(answer.split())
     if word_count < 5:  # Adjust minimum word count as needed
         return jsonify({
-            "mission_id": mission_id,
+            "mission_id": mission_id,   
             # "error": "Answer must contain at least 5 words",
             "detailed_scores": {
                 "Knowledge_Agriculture_Score": 0.0,
@@ -158,15 +157,16 @@ def process_answer():
             qualitative_assessment = "Limited understanding. Could benefit from more specific knowledge, local context, and examples."
         
         # Return the result
-        return jsonify({
+        return {
             "mission_id": mission_id,
             "detailed_scores": detailed_scores,
             "qualitative_assessment": qualitative_assessment
-        })
+        }
+        print("Response:", response)  # Log the response
+        return jsonify(response)
         
     except Exception as e:
-        print(f"Inference error: {str(e)}")
-        return jsonify({
+        response = {
             "mission_id": mission_id,
             "error": str(e),
             "detailed_scores": {
@@ -175,7 +175,9 @@ def process_answer():
                 "Use_of_Example_Data_Score": 0.0,
                 "Average_Score": 0.0
             }
-        }), 500
+        }
+        print("Response:", response)  # Log the response
+        return jsonify(response), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=5000, debug=True)
