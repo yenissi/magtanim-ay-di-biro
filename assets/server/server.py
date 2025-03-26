@@ -4,7 +4,8 @@ import torch
 from transformers import XLMRobertaTokenizer, XLMRobertaModel
 from torch import nn
 import re
-
+import os
+import  gdown
 # Initialize Flask app
 app = Flask(__name__)
 
@@ -44,13 +45,27 @@ tokenizer = XLMRobertaTokenizer.from_pretrained('xlm-roberta-base')
 print("Initializing model...")
 model = MultilingualAgricultureModel().to(device)
 
+MODEL_PATH = "best_multilingual_agriculture_model.pt"
+MODEL_URL = "https://drive.google.com/uc?id=1cGJdQmkUQplEd0ZDr1wjgdYSMf2u9Zru"
+
+# Download the model if it doesn’t exist
+if not os.path.exists(MODEL_PATH):
+    print("Downloading model file...")
+    try:
+        gdown.download(MODEL_URL, MODEL_PATH, quiet=False)
+        print("Model downloaded successfully!")
+    except Exception as e:
+        print(f"Error downloading model: {e}")
+        raise Exception("Failed to download the model file. Cannot proceed.")
+
 # Load your custom weights
 print("Loading saved model weights...")
 try:
-    model.load_state_dict(torch.load('best_multilingual_agriculture_model.pt', map_location=device))
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
     print("Model loaded successfully!")
 except Exception as e:
     print(f"Error loading model: {e}")
+    raise Exception(f"Failed to load the model: {e}")
 
 # Text sanitization function
 def sanitize_input(text):
@@ -121,7 +136,6 @@ def process_answer():
     if word_count < 5:  # Adjust minimum word count as needed
         return jsonify({
             "mission_id": mission_id,   
-            # "error": "Answer must contain at least 5 words",
             "detailed_scores": {
                 "Knowledge_Agriculture_Score": 0.0,
                 "Awareness_Local_Agriculture_Score": 0.0,
@@ -180,4 +194,5 @@ def process_answer():
         return jsonify(response), 500
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    PORT = int(os.environ.get('PORT', 5000))
+    app.run(host="0.0.0.0", port=PORT, debug=False)
