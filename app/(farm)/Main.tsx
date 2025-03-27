@@ -65,6 +65,7 @@ interface MissionProgress {
   const [composeModalVisible, setComposeModalVisible] = useState(false);
   const [decomposedItems, setDecomposedItems] = useState<InventoryItem[]>([]);
   const [purchasedTools, setPurchasedTools] = useState<string[]>([]);
+  const [hasVisitedShop, setHasVisitedShop] = useState(false);
   
   const [statistics, setStatistics] = useState({
     plantsGrown: 0,
@@ -945,6 +946,8 @@ interface MissionProgress {
           onAddToDecompose={handleAddToDecompose}
           onAddToNormalInventory={onAddToNormalInventory}
           onMissionProgress={handleMissionProgress}
+          hasVisitedShop={hasVisitedShop} 
+          onShopModalOpened={() => setHasVisitedShop(true)}
         />
       </View>
     </ImageBackground>

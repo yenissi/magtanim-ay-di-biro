@@ -66,10 +66,58 @@ const FLOOD_CHANCE = 0.1;
 const FLOOD_CHECK_INTERVAL = 30000;
 
 // Tutorial Overlay Component
-const TutorialOverlay = ({ message, onNext, onClose }) => (
+const TutorialOverlay = ({ message, onNext, onClose, highlight }) => (
   <View className="absolute top-[-75px] right-[-100px] w-[400px] p-[8px]">
     <View className="bg-white p-3 rounded-lg" pointerEvents="auto">
       <Text className="text-[14px] font-normal mb-2">{message}</Text>
+      {highlight === "ShopModal" && (
+        <View className="flex-row items-center mb-2">
+          <Text className="text-[12px] text-yellow-700">
+            Look at the top-right corner for the Shop button! ➡️
+          </Text>
+          <Image
+            source={require('@/assets/images/shop.png')} // Replace with your Shop button image path
+            className="w-[24px] h-[24px] ml-2"
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      {highlight === "Regadera" && (
+        <View className="flex-row items-center mb-2">
+          <Text className="text-[12px] text-yellow-700">
+            Find the Regadera in your Bag! ➡️
+          </Text>
+          <Image
+            source={require('@/assets/images/regadera.png')} // Replace with your Regadera image path
+            className="w-[24px] h-[24px] ml-2"
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      {highlight === "Sibuyas" && (
+        <View className="flex-row items-center mb-2">
+          <Text className="text-[12px] text-yellow-700">
+            Pick the Sibuyas seed or any crops from your Bag! ➡️
+          </Text>
+          <Image
+            source={require('@/assets/images/sibuyas.png')} // Replace with your Sibuyas image path
+            className="w-[24px] h-[24px] ml-2"
+            resizeMode="contain"
+          />
+        </View>
+      )}
+      {highlight === "Synthetic Fertilizer" && (
+        <View className="flex-row items-center mb-2">
+          <Text className="text-[12px] text-yellow-700">
+            Grab the Synthetic Fertilizer from your Bag! ➡️
+          </Text>
+          <Image
+            source={require('@/assets/images/fertilizer.png')} // Replace with your Synthetic Fertilizer image path
+            className="w-[24px] h-[24px] ml-2"
+            resizeMode="contain"
+          />
+        </View>
+      )}
       <View className="flex-row justify-end">
         <TouchableOpacity onPress={onNext} className="bg-green-500 p-[8px] rounded-lg">
           <Text className="text-white text-[12px]">Next</Text>
@@ -96,6 +144,8 @@ interface TanimanProps {
   decomposedItems: InventoryItem[];
   onAddToNormalInventory: (item: InventoryItem) => void;
   onMissionProgress?: (action: string, details: any) => void;
+  onShopModalOpened?: () => void;
+  hasVisitedShop?: boolean;
 }
 
 export const Taniman: React.FC<TanimanProps> = ({
@@ -112,6 +162,8 @@ export const Taniman: React.FC<TanimanProps> = ({
   onAddToNormalInventory,
   decomposedItems,
   onMissionProgress,
+  onShopModalOpened,
+  hasVisitedShop = false,
 }) => {
   const GRID_SIZE = 3;
   const [sound, setSound] = useState<Audio.Sound | null>(null);
@@ -134,14 +186,15 @@ export const Taniman: React.FC<TanimanProps> = ({
 
   const tutorialSteps = [
     { message: "Welcome to Taniman! Let's learn how to grow crops.", highlight: null },
-    { message: "First, select the 'Asarol' tool in the bag to plow the soil.", highlight: "Asarol" },
+    { message: "First, visit the Shop (top-right) to buy tools and crops.", highlight: "ShopModal" },
+    { message: "First, select the 'Asarol' tool in the Bag to plow the soil.", highlight: "Asarol" },
     { message: "Now, tap on an empty plot to plow it.", highlight: "plot" },
-    { message: "Second, select the 'Regadera' tool in the bag to water the plot.", highlight: "Regadera" },
+    { message: "Second, select the 'Regadera' tool in the Bag to water the plot.", highlight: "Regadera" },
     { message: "Now, tap on a plowed plot to water it", highlight: "plot" },
-    { message: "Next, select a crop seed from your inventory.", highlight: "Sibuyas" },
+    { message: "Next, select a crop seed from your Bag..", highlight: "Sibuyas" },
     { message: "Tap the watered plot to plant the seed.", highlight: "plot" },
     { message: "Wait for the crop to grow. Click 'Next' to simulate growth.", highlight: "plot" },
-    { message: "To speed up growth, select 'Synthetic Fertilizer' in the bag.", highlight: "Synthetic Fertilizer" },
+    { message: "To speed up growth, select 'Synthetic Fertilizer' in the Bag.", highlight: "Synthetic Fertilizer" },
     { message: "Tap the planted plot to apply the fertilizer.", highlight: "plot" },
     { message: "Once the crop is fully grown, select the 'Itak' tool to harvest it.", highlight: "Itak" },
     { message: "Tap the fully grown crop to harvest it.", highlight: "plot" },
@@ -152,13 +205,13 @@ export const Taniman: React.FC<TanimanProps> = ({
     asarolSelected: false,
     plotPlowed: false,
     regaderaSelected: false,
+    shopVisited: false,
   });
 
   const advanceTutorial = () => {
     setTutorialStep((prevStep) => {
       console.log(`Advancing from step ${prevStep} to ${prevStep + 1}`);
       if (prevStep + 1 >= tutorialSteps.length) {
-        // Tutorial completed
         setIsTutorialActive(false);
         markTutorialCompleted();
         return prevStep;
@@ -171,93 +224,97 @@ export const Taniman: React.FC<TanimanProps> = ({
     try {
       const userId = Firebase_Auth.currentUser?.uid;
       if (userId) {
-        // Save to Firebase for authenticated users
         const tutorialRef = ref(Firebase_Database, `users/${userId}/tutorialCompleted`);
         await set(tutorialRef, true);
       }
-      // Save to AsyncStorage for all users
       await AsyncStorage.setItem('tutorialCompleted', 'true');
     } catch (error) {
       console.error('Error marking tutorial completed:', error);
     }
   };
 
-  // Check tool selection for tutorial steps
   useEffect(() => {
     console.log(`Current step: ${tutorialStep}, Selected item: ${selectedItem?.title}`);
     if (isTutorialActive) {
-        switch (tutorialStep) {
-            case 1: // Asarol selection step
-                if (selectedItem?.title === 'Asarol') {
-                    setTutorialRequirements(prev => ({ ...prev, asarolSelected: true }));
-                    advanceTutorial();
-                }
-                break;
+      switch (tutorialStep) {
+        case 1: // ShopModal step
+          if (hasVisitedShop) {
+            setTutorialRequirements((prev) => ({ ...prev, shopVisited: true }));
+            advanceTutorial();
+          }
+          break;
 
-            case 2: // Plot plowing step
-                if (plots.some(row => row.some(plot => plot.isPlowed))) {
-                    setTutorialRequirements(prev => ({ ...prev, plotPlowed: true }));
-                    advanceTutorial();
-                }
-                break;
+        case 2: // Asarol selection step
+          if (selectedItem?.title === 'Asarol') {
+            setTutorialRequirements((prev) => ({ ...prev, asarolSelected: true }));
+            advanceTutorial();
+          }
+          break;
 
-            case 3: // Regadera selection step
-                if (selectedItem?.title === 'Regadera') {
-                    setTutorialRequirements(prev => ({ ...prev, regaderaSelected: true }));
-                    advanceTutorial();
-                }
-                break;
+        case 3: // Plot plowing step
+          if (plots.some((row) => row.some((plot) => plot.isPlowed))) {
+            setTutorialRequirements((prev) => ({ ...prev, plotPlowed: true }));
+            advanceTutorial();
+          }
+          break;
 
-            case 4: // Plot watering step
-                if (plots.some(row => row.some(plot => plot.isWatered))) {
-                    advanceTutorial();
-                }
-                break;
+        case 4: // Regadera selection step
+          if (selectedItem?.title === 'Regadera') {
+            setTutorialRequirements((prev) => ({ ...prev, regaderaSelected: true }));
+            advanceTutorial();
+          }
+          break;
 
-            case 5: // Seed selection step
-                if (selectedItem?.type === 'crop' || selectedItem?.type === 'tree') {
-                    advanceTutorial();
-                }
-                break;
+        case 5: // Plot watering step
+          if (plots.some((row) => row.some((plot) => plot.isWatered))) {
+            advanceTutorial();
+          }
+          break;
 
-            case 6: // Planting step
-                if (plots.some(row => row.some(plot => plot.plant && plot.plant.stage === 0))) {
-                    advanceTutorial();
-                }
-                break;
+        case 6: // Seed selection step
+          if (selectedItem?.type === 'crop' || selectedItem?.type === 'tree') {
+            advanceTutorial();
+          }
+          break;
 
-            case 7: // Waiting for growth (manual advance handled by "Next" button)
-                // No automatic check needed - user clicks "Next" to proceed
-                break;
+        case 7: // Planting step
+          if (plots.some((row) => row.some((plot) => plot.plant && plot.plant.stage === 0))) {
+            advanceTutorial();
+          }
+          break;
 
-            case 8: // Fertilizer selection step
-                if (selectedItem?.title === 'Synthetic Fertilizer') {
-                    advanceTutorial();
-                }
-                break;
+        case 8: // Waiting for growth (manual advance)
+          break;
 
-            case 9: // Fertilizer application step
-                if (plots.some(row => row.some(plot => plot.plant?.isFertilized))) {
-                    advanceTutorial();
-                }
-                break;
+        case 9: // Fertilizer selection step
+          if (selectedItem?.title === 'Synthetic Fertilizer') {
+            advanceTutorial();
+          }
+          break;
 
-            case 10: // Itak selection step
-                if (selectedItem?.title === 'Itak') {
-                    advanceTutorial();
-                }
-                break;
+        case 10: // Fertilizer application step
+          if (plots.some((row) => row.some((plot) => plot.plant?.isFertilized))) {
+            advanceTutorial();
+          }
+          break;
 
-            case 11: // Harvesting step
-                if (plots.some(row => row.some(plot => plot.plant?.stage === 3))) {
-                }
-                break;
+        case 11: // Itak selection step
+          if (selectedItem?.title === 'Itak') {
+            advanceTutorial();
+          }
+          break;
 
-            case 12: // Final step (congratulations)
-                break;
-        }
+        case 12: // Harvesting step
+          if (plots.some((row) => row.some((plot) => plot.plant?.stage === 3))) {
+            // Advance is handled in handleHarvest
+          }
+          break;
+
+        case 13: // Final step (congratulations)
+          break;
+      }
     }
-}, [selectedItem, tutorialStep, isTutorialActive, plots]);
+  }, [selectedItem, tutorialStep, isTutorialActive, plots, hasVisitedShop]);
 
 
 useEffect(() => {
@@ -1115,6 +1172,7 @@ useEffect(() => {
             setIsTutorialActive(false);
             markTutorialCompleted();
           }}
+          highlight={tutorialSteps[tutorialStep].highlight}
         />
       )}
     </View>

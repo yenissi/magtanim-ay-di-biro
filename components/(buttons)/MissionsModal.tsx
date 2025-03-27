@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
+import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
 import type { Mission } from '@/types';
 import { ref, update, get } from 'firebase/database';
 import { Firebase_Database } from '@/firebaseConfig';
@@ -13,6 +14,19 @@ interface MissionsModalProps {
   userId?: string;
 }
 
+interface ApiResponse {
+  mission_id: number;
+  detailed_scores: {
+    Knowledge_Agriculture_Score: number;
+    Awareness_Local_Agriculture_Score: number;
+    Use_of_Example_Data_Score: number;
+    Average_Score: number;
+  };
+  qualitative_assessment?: string;
+  predictions?: any;
+  error?: string;
+}
+
 export const MissionsModal = ({
   visible,
   onClose,
@@ -23,9 +37,12 @@ export const MissionsModal = ({
   const [selectedMission, setSelectedMission] = useState<Mission | null>(null);
   const [answer, setAnswer] = useState<string>('');
   const [localMissions, setLocalMissions] = useState<Mission[]>(propMissions);
-  const [answeredMissions, setAnsweredMissions] = useState<Set<number>>(new Set()); // Track answered missions
+  const [answeredMissions, setAnsweredMissions] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const API_BASE_URL = 'http://192.168.1.7:5000';
+  const API_TIMEOUT = 15000;
 
   useEffect(() => {
     if (!userId || !visible) return;
@@ -41,7 +58,6 @@ export const MissionsModal = ({
           await update(missionsRef, propMissions);
         }
 
-        // Load answered missions from Firebase
         const completedRef = ref(Firebase_Database, `users/${userId}/missionsCompleted`);
         const completedSnapshot = await get(completedRef);
         if (completedSnapshot.exists()) {
@@ -64,66 +80,83 @@ export const MissionsModal = ({
     }
   }, [selectedMission]);
 
-  const handleCompleteMission = (mission: Mission) => {
-    if (mission.completed && !answeredMissions.has(mission.id)) {
-      setSelectedMission(mission);
-    }
-  };
-  
-  const API_BASE_URL = 'http://192.168.0.12:5000';
-  
-  const validateAnswer = (text) => {
-    // Check for empty or very short answers
-    if (!text.trim()) {
-      return "Please enter an answer";
-    }
-    
-    // Check for single character answers
-    if (text.trim().length <= 1) {
-      return "Answer is too short";
-    }
-    
-    // Check for minimum word count
+  const validateAnswer = (text: string) => {
+    if (!text.trim()) return "Please enter an answer";
+    if (text.trim().length <= 1) return "Answer is too short";
     const wordCount = text.trim().split(/\s+/).length;
-    if (wordCount < 5) {
-      return "Your answer must contain at least 5 words";
-    }
-    
-    return null; // No error
+    if (wordCount < 5) return "Your answer must contain at least 5 words";
+    return null;
   };
-  
+
+  const handleCompleteMission = (mission: Mission) => {
+    setSelectedMission(mission);
+  };
+
+  const checkConnectivity = async () => {
+    try {
+      // Use NetInfo to check the connection
+      const state = await NetInfo.fetch();
+      if (!state.isConnected) {
+        return false;
+      }
+
+      // If connected, try pinging the server
+      const response = await fetch(API_BASE_URL, { method: 'GET', timeout: 5000 });
+      return response.ok;
+    } catch (error) {
+      console.error("Connectivity check failed:", error);
+      return false;
+    }
+  };
+
   const handleSubmitAnswer = async () => {
     if (!selectedMission || !userId) return;
-    
-    // Validate the answer
+
+    // Check connectivity using NetInfo and server ping
+    const isOnline = await checkConnectivity();
+    if (!isOnline) {
+      Alert.alert(
+        "Connection Error",
+        "Cannot reach the server. Please check your internet connection and try again.",
+        [
+          { text: "OK", onPress: () => {} },
+          { text: "Retry", onPress: () => handleSubmitAnswer() }, // Add retry option
+        ]
+      );
+      return;
+    }
+
     const validationError = validateAnswer(answer);
     if (validationError) {
       setErrorMessage(validationError);
       return;
     }
-    
+
     setIsLoading(true);
     setErrorMessage(null);
-  
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
       const response = await fetch(`${API_BASE_URL}/process-answer`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mission_id: selectedMission.id,
           answer: answer,
         }),
+        signal: controller.signal,
       });
-  
-      const result = await response.json();
-      
+
+      clearTimeout(timeoutId);
+
       if (!response.ok) {
-        throw new Error(result.error || 'Failed to process answer');
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to process answer');
       }
-  
-      // Save the result to Firebase including detailed scores
+
+      const result = await response.json();
+
       const missionData = {
         answer,
         completedAt: new Date().toISOString(),
@@ -131,38 +164,37 @@ export const MissionsModal = ({
         questionEnglish: selectedMission.questions.english,
         questionTagalog: selectedMission.questions.tagalog,
         predictions: result.predictions,
-        detailedScores: result.detailed_scores || {}
+        detailedScores: result.detailed_scores,
       };
-  
+
       const userMissionRef = ref(Firebase_Database, `users/${userId}/missionsCompleted/${selectedMission.id}`);
       await update(userMissionRef, missionData);
-  
-      // Mark mission as answered
+
       setAnsweredMissions(prev => new Set(prev).add(selectedMission.id));
-  
-      // Award reward
       onMissionComplete(selectedMission.id, answer);
-  
+
       setSelectedMission(null);
       setAnswer('');
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        setErrorMessage("Request timed out. Please try again.");
+      } else {
+        setErrorMessage(error.message || "Error submitting answer. Please try again.");
+      }
       console.error("Error saving mission answer:", error);
-      setErrorMessage(error.message || "Error submitting answer. Please try again.");
     } finally {
       setIsLoading(false);
     }
   };
-  
+
   const handleViewAnswer = async (mission: Mission) => {
-    if (!userId || !mission.completed) return;
+    if (!userId) return;
     setIsLoading(true);
     try {
       const missionRef = ref(Firebase_Database, `users/${userId}/missionsCompleted/${mission.id}`);
       const snapshot = await get(missionRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        
-        // Format scores for display on 0-5 scale
         let scoresText = "";
         if (data.detailedScores) {
           const scores = data.detailedScores;
@@ -172,12 +204,9 @@ Awareness: ${scores.Awareness_Local_Agriculture_Score}/5
 Examples: ${scores.Use_of_Example_Data_Score}/5
 Average: ${scores.Average_Score}/5`;
         }
-        
         Alert.alert(
           "Your Answer",
-          `${data.answer}
-          
-${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
+          `${data.answer}\n\n${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
           [{ text: "OK" }]
         );
       } else {
@@ -191,12 +220,10 @@ ${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
     }
   };
 
-  // Function to render stars based on score (0-5)
-  const renderScoreStars = (score) => {
+  const renderScoreStars = (score: number) => {
     const fullStars = Math.floor(score);
     const halfStar = score - fullStars >= 0.5;
     const emptyStars = 5 - fullStars - (halfStar ? 1 : 0);
-    
     return (
       <Text>
         {'★'.repeat(fullStars)}
@@ -217,7 +244,7 @@ ${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
           <View className="bg-orange-300 p-6 rounded-lg w-full max-w-md">
             <Text className="text-black mb-1">English: {english}</Text>
             <Text className="text-black mb-1">Tagalog: {tagalog}</Text>
-            
+
             <TextInput
               className={`border ${errorMessage ? 'border-red-500' : 'border-black-300'} p-2 rounded-lg h-[120px]`}
               placeholder="Enter your answer... (minimum 5 words)"
@@ -226,19 +253,18 @@ ${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
               value={answer}
               onChangeText={(text) => {
                 setAnswer(text);
-                // Clear error when user starts typing
                 if (errorMessage) setErrorMessage(null);
               }}
             />
-            
+
             {errorMessage ? (
               <Text className="text-red-500 text-sm mt-1">{errorMessage}</Text>
             ) : null}
-            
+
             <Text className="text-gray-600 text-xs mt-1">
               Word count: {answer.trim().split(/\s+/).filter(Boolean).length}/5 minimum
             </Text>
-            
+
             <TouchableOpacity
               className={`p-3 rounded-lg mt-2 ${isLoading ? 'bg-gray-400' : !errorMessage && answer.trim() ? 'bg-green-500' : 'bg-gray-300'}`}
               onPress={handleSubmitAnswer}
@@ -248,7 +274,7 @@ ${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
                 {isLoading ? 'Submitting...' : 'Submit'}
               </Text>
             </TouchableOpacity>
-            
+
             <TouchableOpacity
               className="mt-2 p-3 bg-red-500 rounded-lg"
               onPress={() => setSelectedMission(null)}
@@ -291,33 +317,28 @@ ${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
           <ScrollView horizontal className="flex-row">
             {localMissions.map((mission) => {
               const isAnswered = answeredMissions.has(mission.id);
+              const isCompleted = mission.completed;
               return (
                 <View
                   key={mission.id}
-                  className={`p-4 rounded-lg w-auto mr-2 ${
-                    mission.completed ? 'bg-green-200' : 'bg-yellow-200'
-                  }`}
+                  className={`p-4 rounded-lg w-auto mr-2 ${isAnswered ? 'bg-green-200' : isCompleted ? 'bg-yellow-300' : 'bg-yellow-200'}`}
                 >
                   <Text className="font-bold mb-2">{mission.title}</Text>
                   <Text className="text-green-600 font-bold mb-4 text-sm">Reward: ₱{mission.reward}.00</Text>
 
                   <TouchableOpacity
                     className={`mt-2 p-2 rounded-lg items-center ${
-                      mission.completed && !isAnswered
-                        ? 'bg-green-500'
-                        : mission.completed && isAnswered
-                        ? 'bg-green-500 opacity-50'
-                        : 'bg-gray-300 opacity-50'
+                      isAnswered ? 'bg-green-500 opacity-50' : isCompleted ? 'bg-green-500' : 'bg-blue-500'
                     }`}
                     onPress={() => handleCompleteMission(mission)}
-                    disabled={!mission.completed || isAnswered || isLoading} 
+                    disabled={isLoading}
                   >
                     <Text className="text-white font-bold">
-                      {mission.completed ? '✅ Completed' : '🔒 In Progress'}
+                      {isAnswered ? '✅ Answered' : isCompleted ? '✅ Completed' : '📝 Answer'}
                     </Text>
                   </TouchableOpacity>
 
-                  {mission.completed && (
+                  {isAnswered && (
                     <TouchableOpacity
                       className="mt-2 p-2 bg-purple-500 rounded-lg items-center"
                       onPress={() => handleViewAnswer(mission)}
