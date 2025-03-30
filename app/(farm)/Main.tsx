@@ -123,17 +123,33 @@ interface MissionProgress {
           setMissions(INITIAL_GAME_STATE.missions);
           await update(missionsRef, INITIAL_GAME_STATE.missions);
         }
-
+  
         const progressRef = ref(Firebase_Database, `users/${params.uid}/missionProgress`);
         const progressSnapshot = await get(progressRef);
         if (progressSnapshot.exists()) {
           const progressData = progressSnapshot.val();
+          // Provide defaults for all fields if they are missing
           setMissionProgress({
             wateredCrops: progressData.wateredCrops || 0,
             plantedCrops: progressData.plantedCrops || 0,
             harvestedCrops: progressData.harvestedCrops || 0,
             usedTools: progressData.usedTools || {},
             usedFertilizers: progressData.usedFertilizers || {},
+            soldCrops: progressData.soldCrops || 0,
+            soldTrees: progressData.soldTrees || 0,
+            organicFertilizersCreated: progressData.organicFertilizersCreated || 0,
+          });
+        } else {
+          // Set default progress if nothing exists in Firebase
+          setMissionProgress({
+            wateredCrops: 0,
+            plantedCrops: 0,
+            harvestedCrops: 0,
+            usedTools: {},
+            usedFertilizers: {},
+            soldCrops: 0,
+            soldTrees: 0,
+            organicFertilizersCreated: 0,
           });
         }
       } catch (error) {
@@ -146,6 +162,10 @@ interface MissionProgress {
   const handleMissionProgress = (action: string, details: any) => {
     setMissionProgress(prev => {
       const newProgress = { ...prev };
+
+      newProgress.usedFertilizers = newProgress.usedFertilizers || {};
+      newProgress.usedTools = newProgress.usedTools || {};
+
       switch (action) {
         case 'waterCrop':
           newProgress.wateredCrops += 1;
@@ -161,7 +181,6 @@ interface MissionProgress {
           newProgress.usedTools[details.tool] = (newProgress.usedTools[details.tool] || 0) + 1;
           break;
         case 'useFertilizer':
-          newProgress.usedFertilizers = newProgress.usedFertilizers || {};
           newProgress.usedFertilizers[details.type] = (newProgress.usedFertilizers[details.type] || 0) + 1;
           break;
         case 'sellCrop':
@@ -284,7 +303,6 @@ interface MissionProgress {
 
   useEffect(() => {
     if (!params.uid) return;
-    
     const userRef = ref(Firebase_Database, `users/${params.uid}`);
     const unsubscribe = onValue(userRef, (snapshot) => {
       if (snapshot.exists()) {
@@ -296,12 +314,7 @@ interface MissionProgress {
             : Object.values(data.inventory);
           
           inventoryArray = inventoryArray.filter(item => item !== null);
-          
-          console.log('Inventory updated from Firebase:', {
-            length: inventoryArray.length,
-            items: inventoryArray.map(item => item?.title || 'unknown')
-          });
-          
+        
           setInventory(inventoryArray);
         } else {
           setInventory([]);
@@ -946,8 +959,8 @@ interface MissionProgress {
           onAddToDecompose={handleAddToDecompose}
           onAddToNormalInventory={onAddToNormalInventory}
           onMissionProgress={handleMissionProgress}
-          hasVisitedShop={hasVisitedShop} 
-          onShopModalOpened={() => setHasVisitedShop(true)}
+          // hasVisitedShop={hasVisitedShop} 
+          // onShopModalOpened={() => setHasVisitedShop(true)}
         />
       </View>
     </ImageBackground>

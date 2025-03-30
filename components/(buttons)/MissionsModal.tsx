@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, Modal, TouchableOpacity, ScrollView, TextInput, Alert } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
-import NetInfo from '@react-native-community/netinfo'; // Import NetInfo
+import NetInfo from '@react-native-community/netinfo';
 import type { Mission } from '@/types';
 import { ref, update, get } from 'firebase/database';
 import { Firebase_Database } from '@/firebaseConfig';
@@ -41,8 +41,8 @@ export const MissionsModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const API_BASE_URL = 'http://192.168.1.7:5000';
-  const API_TIMEOUT = 15000;
+  const API_BASE_URL = 'http://192.168.254.144:5000';
+  const API_TIMEOUT = 30000;
 
   useEffect(() => {
     if (!userId || !visible) return;
@@ -94,13 +94,10 @@ export const MissionsModal = ({
 
   const checkConnectivity = async () => {
     try {
-      // Use NetInfo to check the connection
       const state = await NetInfo.fetch();
       if (!state.isConnected) {
         return false;
       }
-
-      // If connected, try pinging the server
       const response = await fetch(API_BASE_URL, { method: 'GET', timeout: 5000 });
       return response.ok;
     } catch (error) {
@@ -112,7 +109,6 @@ export const MissionsModal = ({
   const handleSubmitAnswer = async () => {
     if (!selectedMission || !userId) return;
 
-    // Check connectivity using NetInfo and server ping
     const isOnline = await checkConnectivity();
     if (!isOnline) {
       Alert.alert(
@@ -120,7 +116,7 @@ export const MissionsModal = ({
         "Cannot reach the server. Please check your internet connection and try again.",
         [
           { text: "OK", onPress: () => {} },
-          { text: "Retry", onPress: () => handleSubmitAnswer() }, // Add retry option
+          { text: "Retry", onPress: () => handleSubmitAnswer() },
         ]
       );
       return;
@@ -280,7 +276,7 @@ Average: ${scores.Average_Score}/5`;
               onPress={() => setSelectedMission(null)}
               disabled={isLoading}
             >
-              <Text className="text-white text-center font-bold">Cancel</Text>
+              <Text className="text-white text-center font，张 bold">Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -338,15 +334,13 @@ Average: ${scores.Average_Score}/5`;
                     </Text>
                   </TouchableOpacity>
 
-                  {isAnswered && (
-                    <TouchableOpacity
-                      className="mt-2 p-2 bg-purple-500 rounded-lg items-center"
-                      onPress={() => handleViewAnswer(mission)}
-                      disabled={isLoading}
-                    >
-                      <Text className="text-white font-bold">📖 View Answer</Text>
-                    </TouchableOpacity>
-                  )}
+                  <TouchableOpacity
+                    className="mt-2 p-2 bg-purple-500 rounded-lg items-center"
+                    onPress={() => handleViewAnswer(mission)}
+                    disabled={isLoading}
+                  >
+                    <Text className="text-white font-bold">📖 View Answer</Text>
+                  </TouchableOpacity>
                 </View>
               );
             })}

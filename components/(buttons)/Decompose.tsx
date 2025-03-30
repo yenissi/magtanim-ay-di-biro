@@ -100,7 +100,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
       if (snapshot.exists() && onLoadRottedItems) {
         const items = Object.values(snapshot.val()) as InventoryItem[];
         onLoadRottedItems(items);
-        console.log('Updated rotted items from Firebase:', items.length);
+        console.log('Updated rotten items from Firebase:', items.length);
       } else if (onLoadRottedItems) {
         onLoadRottedItems([]);
       }
@@ -237,7 +237,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
     if (selectedRottedItems.length < REQUIRED_ITEMS_FOR_FERTILIZER) {
       Alert.alert(
         'Not Enough Items',
-        `You need at least ${REQUIRED_ITEMS_FOR_FERTILIZER} rotted plants to create fertilizer.`
+        `You need at least ${REQUIRED_ITEMS_FOR_FERTILIZER} rotten plants to create fertilizer.`
       );
       return;
     }
@@ -306,7 +306,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
       setSelectedRottedItems([]);
       Alert.alert(
         'Composting Complete!',
-        `Converted ${selectedItemsCount} rotted items into ${fertilizerCount} fertilizer.`
+        `Converted ${selectedItemsCount} rotten items into ${fertilizerCount} fertilizer.`
       );
     } catch (error) {
       console.error('Error during decomposition:', error);
@@ -393,7 +393,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
               className={`flex-1 p-2 rounded-tl-lg rounded-bl-lg ${activeTab === 'rotted' ? 'bg-brown-600' : 'bg-brown-400'}`}
             >
               <Text className={`text-center font-semibold ${activeTab === 'rotted' ? 'text-white' : 'text-brown-800'}`}>
-                Rotted Plants
+                Rotten Plants
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -409,12 +409,12 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
           {activeTab === 'rotted' ? (
             <View>
               <Text className="text-[10px] mb-1 text-brown-800">
-                Convert rotted plants into valuable fertilizer! Select at least {REQUIRED_ITEMS_FOR_FERTILIZER} items.
+                Convert rotten plants into valuable fertilizer! Select at least {REQUIRED_ITEMS_FOR_FERTILIZER} items.
               </Text>
               
               <View className="flex-row justify-between items-center mb-2">
                 <Text className="font-semibold text-brown-800">
-                  Rotted Items ({rottedItems.length})
+                  Rotten Items ({rottedItems.length})
                 </Text>
               </View>
 
@@ -436,11 +436,11 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
                     </TouchableOpacity>
                   )}
                   ListEmptyComponent={
-                    <Text className="text-center py-4 text-brown-800">No rotted items available.</Text>
+                    <Text className="text-center py-4 text-brown-800">No rotten items available.</Text>
                   }
                 />
               ) : (
-                <Text className="text-center py-4 text-brown-800">No rotted items available.</Text>
+                <Text className="text-center py-4 text-brown-800">No rotten items available.</Text>
               )}
 
               <TouchableOpacity
