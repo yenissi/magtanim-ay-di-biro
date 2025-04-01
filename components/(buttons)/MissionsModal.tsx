@@ -41,7 +41,7 @@ export const MissionsModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const API_BASE_URL = 'http://192.168.1.7:5000';
+  const API_BASE_URL = 'http://192.168.1.2:5000';
   const API_TIMEOUT = 15000;
 
   useEffect(() => {
