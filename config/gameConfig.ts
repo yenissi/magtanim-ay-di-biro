@@ -1,6 +1,6 @@
 export const INITIAL_GAME_STATE = {
     level: 1,
-    money: 500,
+    money: 10500,
     missions: [
       {
         id: 1,
@@ -40,7 +40,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 4,
-        title: "Mag tanim ng 2 Ornamental Plant",
+        title: "Mag tanim ng 2 Santa",
         questions: {
           tagalog: "Ano ang mga pakinabang ng pagtatanim ng mga halamang ornamental sa inyong hardin o pamayanan?",
           english: "What are the benefits of planting ornamental plants in your garden or community?",
@@ -52,7 +52,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 5,
-        title: "Mag tanim ng 3 Ornamental Plant",
+        title: "Mag tanim ng 3 Santan",
         questions: {
           tagalog: "Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpigil ng pagguho ng lupa, pagbaha at pagpapanatili ng kalidad ng tubig?",
           english: "How do ornamental plants and trees help in preventing soil erosion, flooding, and maintaining water quality?",
@@ -64,7 +64,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 6,
-        title: "Mag tanim ng 4 Ornamental Plant",
+        title: "Mag tanim ng 4 Santan",
         questions: {
           tagalog: "Paano nakakatulong ang mga halamang ornamental at mga puno sa pagpapababa ng polusyon sa hangin?",
           english: "How do ornamental plants and trees contribute to reducing air pollution?",
@@ -76,7 +76,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 7,
-        title: "Mag tanim ng 5 Ornamental Plant",
+        title: "Mag tanim ng 5 Santan",
         questions:{
           tagalog: "Paano pinapaganda ng mga halamang ornamental ang isang lugar?",
           english: "How do ornamental plants enhance the aesthetic value of a place?",
@@ -88,7 +88,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 8,
-        title: "Mag tanim ng 6 Ornamental Plant",
+        title: "Mag tanim ng 6 Santan",
         questions:{
           tagalog: "Bakit mahalagang pumili ng tamang halamang ornamental para sa inyong hardin?",
           english: "Why is it important to choose the right ornamental plants for your garden?",
@@ -148,7 +148,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 13,
-        title: "Mag tanim ng tree",
+        title: "Mag tanim ng Mangga",
         questions:{
           tagalog: "Bakit mahalaga ang mga puno sa kapaligiran at sa buhay ng tao?",
           english: "Why are trees important for the environment and human life?" ,
@@ -184,7 +184,7 @@ export const INITIAL_GAME_STATE = {
       },
       {
         id: 16,
-        title: "Mag Benta ng Tree",
+        title: "Mag Benta ng Prutas",
         questions: {
           tagalog: "Paano maaaring pagkakitaan ng mga pamilya ang mga halamang ornamental?",
           english: "How can ornamental plants be used as a source of income for families",

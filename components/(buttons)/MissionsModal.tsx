@@ -41,7 +41,7 @@ export const MissionsModal = ({
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const API_BASE_URL = 'http://192.168.254.144:5000';
+  const API_BASE_URL = 'https://magtanim-api-508922549344.us-central1.run.app';
   const API_TIMEOUT = 30000;
 
   useEffect(() => {

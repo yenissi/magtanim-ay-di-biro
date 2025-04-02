@@ -82,6 +82,7 @@ interface MissionProgress {
     soldCrops: number;              
     soldTrees: number;             
     organicFertilizersCreated: number;
+    plantedSantan: number;
   }>({
     wateredCrops: 0,
     plantedCrops: 0,
@@ -91,6 +92,7 @@ interface MissionProgress {
     soldCrops: 0,                  
     soldTrees: 0,                   
     organicFertilizersCreated: 0,
+    plantedSantan: 0,
   });
   
   const [plots, setPlots] = useState<PlotStatus[][]>(
@@ -138,6 +140,7 @@ interface MissionProgress {
             soldCrops: progressData.soldCrops || 0,
             soldTrees: progressData.soldTrees || 0,
             organicFertilizersCreated: progressData.organicFertilizersCreated || 0,
+            plantedSantan: progressData.plantedSantan || 0,
           });
         } else {
           // Set default progress if nothing exists in Firebase
@@ -150,6 +153,7 @@ interface MissionProgress {
             soldCrops: 0,
             soldTrees: 0,
             organicFertilizersCreated: 0,
+            plantedSantan: 0,
           });
         }
       } catch (error) {
@@ -162,9 +166,9 @@ interface MissionProgress {
   const handleMissionProgress = (action: string, details: any) => {
     setMissionProgress(prev => {
       const newProgress = { ...prev };
-
       newProgress.usedFertilizers = newProgress.usedFertilizers || {};
       newProgress.usedTools = newProgress.usedTools || {};
+      newProgress.plantedSantan = newProgress.plantedSantan || 0;
 
       switch (action) {
         case 'waterCrop':
@@ -172,7 +176,10 @@ interface MissionProgress {
           break;
         case 'plantCrop':
           newProgress.plantedCrops += 1;
-          if (details.cropType.includes('Ornamental')) newProgress.plantedCrops += 1;
+        if (details.cropType === 'Santan') {
+          newProgress.plantedSantan += 1;
+          console.log(`Planted Santan, Count: ${newProgress.plantedSantan}`);
+        }
           break;
         case 'harvestCrop':
           newProgress.harvestedCrops += 1;
@@ -201,16 +208,17 @@ interface MissionProgress {
         if (mission.title.includes('Mag Dilig ng') && mission.title.match(/(\d+)/)) {
           const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
           isComplete = newProgress.wateredCrops >= required;
-        } else if (mission.title.includes('Mag tanim ng') && mission.title.match(/(\d+)/)) {
+        } else if (mission.title.includes('Mag tanim ng Santan') && mission.title.match(/(\d+)/)) {
           const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
-          isComplete = newProgress.plantedCrops >= required;
+          console.log(`Santan required: ${required}, Current: ${newProgress.plantedSantan}`);
+          isComplete = newProgress.plantedSantan >= required;
         } else if (mission.title === 'Gumamit ng Asarol') {
           isComplete = (newProgress.usedTools['Asarol'] || 0) >= 1;
         } else if (mission.title === 'Gumamit ng Synthetic Fertilizer') {
           isComplete = (newProgress.usedFertilizers['Synthetic Fertilizer'] || 0) >= 1;
         } else if (mission.title === 'Gumamit ng Organic Fertilizer') {
           isComplete = (newProgress.usedFertilizers['Organic Fertilizer'] || 0) >= 1;
-        } else if (mission.title === 'Mag tanim ng tree') {
+        } else if (mission.title === 'Mag tanim ng') {
           isComplete = newProgress.plantedCrops >= 1 && details.cropType === 'Mangga'; 
         }else if (mission.title === 'Mag Benta ng Crops') {
           isComplete = (newProgress.soldCrops || 0) >= 1;
