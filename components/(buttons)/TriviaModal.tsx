@@ -202,7 +202,13 @@ const TriviaModal = ({ visible, onClose }: TriviaModalProps ) => {
               <Text className="text-[12px]">a. Ang halaga o presyo ng mga halamang ornamental ay ibinabatay sa kanilang laki, uri, at haba ng pag-aalaga.</Text>
               <Text className="text-[12px]">b. Ipinagbibili ang halamang ornamental nang nakapaso o nakaplastik at minsan sanga o tangkay.</Text>
               <Text className="text-[12px]">c. Mahalaga ang kaalaman sa pagtutuos upang malaman kung kumikita o nalulugi ang paghahalaman.</Text>
-              <Text className="text-[12px] text-justify mb-4">Sa mga nag-aalaga ng halamang ornamental na namumulaklak at di namumulaklak, may mga palatandaan na tinitingnan kung ito ay dapat ng ipagbili. Kadalasan, ang mga ito ay matataas, malalago at magaganda ang mga dahon. Ang tamang pagkuha ng mga bulaklak ay kung ito ay malapit ng bumuka at bumukadkad. Tinatanggal ang ibang dahon at tinatali sa isang malilim na lugar. Ang paglalagay sa timba na may tubig ay nagpapatagal sa kanilang kasariwaan.</Text>
+              <Text className="text-[12px] text-justify">Sa mga nag-aalaga ng halamang ornamental na namumulaklak at di namumulaklak, may mga palatandaan na tinitingnan kung ito ay dapat ng ipagbili. Kadalasan, ang mga ito ay matataas, malalago at magaganda ang mga dahon. Ang tamang pagkuha ng mga bulaklak ay kung ito ay malapit ng bumuka at bumukadkad. Tinatanggal ang ibang dahon at tinatali sa isang malilim na lugar. Ang paglalagay sa timba na may tubig ay nagpapatagal sa kanilang kasariwaan.</Text>
+              <View className="mb-10">
+                <Text className="text-lg font-medium text-center">References</Text>
+                <Text className="text-[12px] mb-1 italic">Kagawaran ng Edukasyon Rehiyon IV-A CALABARZON. (2020). EPP (Agriculture) Ikaapat na Baitang: PIVOT IV-A Learner’s Material (Unang Edisyon). Kagawaran ng Edukasyon.</Text>
+                <Text className="text-[12px] mb-1 italic">Kagawaran ng Edukasyon Rehiyon IV-A CALABARZON. (2020). Edukasyong Pantahanan at Pangkabuhayan (EPP-AGRI) Ikalimang Baitang: PIVOT IV-A Learner’s Material – Unang Markahan (Unang Edisyon). Kagawaran ng Edukasyon.</Text>
+                <Text className="text-[12px] mb-1 italic">Kagawaran ng Edukasyon Rehiyon IV-A CALABARZON. (2022). PIVOT 4A Learner’s Material: Agriculture and Fishery Arts – Grade 6 (Second Edition). Kagawaran ng Edukasyon.</Text>
+              </View>
             </View>
 
           </ScrollView>

@@ -40,6 +40,16 @@ export const MissionsModal = ({
   const [answeredMissions, setAnsweredMissions] = useState<Set<number>>(new Set());
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [answerModalVisible, setAnswerModalVisible] = useState(false); // New state for custom modal
+  const [answerData, setAnswerData] = useState<{
+    answer: string;
+    scores?: {
+      Knowledge_Agriculture_Score: number;
+      Awareness_Local_Agriculture_Score: number;
+      Use_of_Example_Data_Score: number;
+      Average_Score: number;
+    };
+  } | null>(null); // New state for answer data
 
   const API_BASE_URL = 'https://magtanim-api-508922549344.us-central1.run.app';
   const API_TIMEOUT = 30000;
@@ -183,6 +193,39 @@ export const MissionsModal = ({
     }
   };
 
+  const getRemark = (score: any, category: string) => {
+    const normalizedScore = Math.round(Number(score)); // Convert to number and round to nearest integer
+    if (isNaN(normalizedScore) || normalizedScore < 1 || normalizedScore > 5) {
+      return "Invalid score.";
+    }
+  
+    switch (category) {
+      case 'Knowledge':
+        if (normalizedScore === 5) return "Demonstrated an in-depth understanding of agricultural concepts and provided detailed, accurate information.";
+        if (normalizedScore === 4) return "Showed a good understanding of most basic agricultural concepts with minor inaccuracies.";
+        if (normalizedScore === 3) return "Displayed a basic understanding with some relevant details but had some inaccuracies or gaps.";
+        if (normalizedScore === 2) return "Showed limited understanding of basic concepts with several inaccuracies.";
+        if (normalizedScore === 1) return "Lacked understanding of agricultural concepts, providing little to no relevant information.";
+        return "No remark available for this score.";
+      case 'Awareness':
+        if (normalizedScore === 5) return "Clearly described local agricultural practices, including specific examples relevant to the Philippines.";
+        if (normalizedScore === 4) return "Described most local agricultural practices accurately with a few specific examples.";
+        if (normalizedScore === 3) return "Showed some awareness of local practices but lacked specific examples.";
+        if (normalizedScore === 2) return "Had limited awareness of local agricultural practices.";
+        if (normalizedScore === 1) return "Showed very little awareness of local practices.";
+        return "No remark available for this score.";
+      case 'Examples':
+        if (normalizedScore === 5) return "Provided multiple, specific examples and rich details to support the response.";
+        if (normalizedScore === 4) return "Included some specific examples and relevant details but lacked depth.";
+        if (normalizedScore === 3) return "Used a few examples and details, which may have been vague or general.";
+        if (normalizedScore === 2) return "Provided minimal examples or details, often irrelevant or superficial.";
+        if (normalizedScore === 1) return "No examples or details provided.";
+        return "No remark available for this score.";
+      default:
+        return "No remark available.";
+    }
+  };
+
   const handleViewAnswer = async (mission: Mission) => {
     if (!userId) return;
     setIsLoading(true);
@@ -191,26 +234,18 @@ export const MissionsModal = ({
       const snapshot = await get(missionRef);
       if (snapshot.exists()) {
         const data = snapshot.val();
-        let scoresText = "";
-        if (data.detailedScores) {
-          const scores = data.detailedScores;
-          scoresText = `
-Knowledge: ${scores.Knowledge_Agriculture_Score}/5
-Awareness: ${scores.Awareness_Local_Agriculture_Score}/5
-Examples: ${scores.Use_of_Example_Data_Score}/5
-Average: ${scores.Average_Score}/5`;
-        }
-        Alert.alert(
-          "Your Answer",
-          `${data.answer}\n\n${scoresText ? 'YOUR SCORES:' + scoresText : 'No detailed scores available'}`,
-          [{ text: "OK" }]
-        );
+        console.log("Detailed Scores:", data.detailedScores);
+        setAnswerData({
+          answer: data.answer,
+          scores: data.detailedScores,
+        });
+        setAnswerModalVisible(true);
       } else {
-        Alert.alert("No Answer", "No answer submitted yet.");
+        Alert.alert("No Answer", "No answer submitted yet.", [{ text: "OK" }]);
       }
     } catch (error) {
       console.error("Error fetching answer:", error);
-      Alert.alert("Error", "Error loading your answer.");
+      Alert.alert("Error", "Error loading your answer.", [{ text: "OK" }]);
     } finally {
       setIsLoading(false);
     }
@@ -276,7 +311,62 @@ Average: ${scores.Average_Score}/5`;
               onPress={() => setSelectedMission(null)}
               disabled={isLoading}
             >
-              <Text className="text-white text-center font，张 bold">Cancel</Text>
+              <Text className="text-white text-center font-bold">Cancel</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
+  const renderAnswerModal = () => {
+    if (!answerModalVisible || !answerData) return null;
+
+    return (
+      <Modal visible={answerModalVisible} transparent animationType="fade">
+        <View className="flex-1 justify-center items-center bg-black/50 p-4">
+          <View className="bg-orange-300 p-6 rounded-lg w-[500px] h-96">
+            <Text className="text-lg font-bold mb-4">Your Answer</Text>
+            <Text className="text-gray-800 mb-4">{answerData.answer}</Text>
+
+            {answerData.scores ? (
+              <ScrollView className="max-h-64">
+                <View className="mb-4">
+                  <Text className="font-bold ">Knowledge</Text>
+                  <Text>Score: {answerData.scores.Knowledge_Agriculture_Score}/5</Text>
+                  <Text className="text-sm text-gray-600">
+                    Remark: {getRemark(answerData.scores.Knowledge_Agriculture_Score, 'Knowledge')}
+                  </Text>
+                </View>
+                <View className="mb-4">
+                  <Text className="font-bold ">Awareness</Text>
+                  <Text>Score: {answerData.scores.Awareness_Local_Agriculture_Score}/5</Text>
+                  <Text className="text-sm text-gray-600">
+                    Remark: {getRemark(answerData.scores.Awareness_Local_Agriculture_Score, 'Awareness')}
+                  </Text>
+                </View>
+                <View className="mb-4">
+                  <Text className="font-bold ">Examples</Text>
+                  <Text>Score: {answerData.scores.Use_of_Example_Data_Score}/5</Text>
+                  <Text className="text-sm text-gray-600">
+                    Remark: {getRemark(answerData.scores.Use_of_Example_Data_Score, 'Examples')}
+                  </Text>
+                </View>
+                <View>
+                  <Text className="font-bold ">Average</Text>
+                  <Text>Score: {answerData.scores.Average_Score}/5</Text>
+                </View>
+              </ScrollView>
+            ) : (
+              <Text className="text-gray-600">No detailed scores available</Text>
+            )}
+
+            <TouchableOpacity
+              className="mt-4 p-3 bg-purple-500 rounded-lg"
+              onPress={() => setAnswerModalVisible(false)}
+              disabled={isLoading}
+            >
+              <Text className="text-white text-center font-bold ">Close</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -348,6 +438,7 @@ Average: ${scores.Average_Score}/5`;
         </View>
       </View>
       {renderQuestionModal()}
+      {renderAnswerModal()} 
     </Modal>
   );
 };

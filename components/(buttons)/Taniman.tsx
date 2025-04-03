@@ -44,25 +44,25 @@ const GROWTH_TIMES = {
 } as const;
 
 const HARVEST_VALUES = {
-  Sibuyas: { normal: 50, rotted: 0 },
-  Mangga: { normal: 150, rotted: 0 },
-  Carrot: { normal: 100, rotted: 0 },
-  Gumamela: { normal: 250, rotted: 0 },
-  Santan: { normal: 150, rotted: 0 },
-  Kamatis: { normal: 100, rotted: 0 },
-  Orchids: { normal: 150, rotted: 0 },
-  Saging: { normal: 100, rotted: 0 },
-  Papaya: { normal: 100, rotted: 0 },
+  Sibuyas: { normal: 50, rotten: 0 },
+  Mangga: { normal: 150, rotten: 0 },
+  Carrot: { normal: 100, rotten: 0 },
+  Gumamela: { normal: 250, rotten: 0 },
+  Santan: { normal: 150, rotten: 0 },
+  Kamatis: { normal: 100, rotten: 0 },
+  Orchids: { normal: 150, rotten: 0 },
+  Saging: { normal: 100, rotten: 0 },
+  Papaya: { normal: 100, rotten: 0 },
 } as const;
 
-const INFESTATION_CHANCE = 0.1;
+const INFESTATION_CHANCE = 0.01;
 const INFESTATION_CHECK_INTERVAL = 10000;
 const DECAY_TIME = 30000;
 const FERTILIZER_GROWTH_MULTIPLIER = 0.5;
-const DROUGHT_CHANCE = 0.1;
+const DROUGHT_CHANCE = 0.01;
 const DROUGHT_CHECK_INTERVAL = 10000;
 const DROUGHT_DECAY_TIME = 30000;
-const FLOOD_CHANCE = 0.1;
+const FLOOD_CHANCE = 0.01;
 const FLOOD_CHECK_INTERVAL = 30000;
 
 // // Tutorial Overlay Component
@@ -583,7 +583,7 @@ export const Taniman: React.FC<TanimanProps> = ({
           ...newPlots[row][col],
           plant: { ...newPlots[row][col].plant!, isRotted: true, hasInfestation: false },
         };
-        Alert.alert('Plant Rotted!', `Your ${plot.plant.cropType} has rotted due to untreated infestation.`);
+        Alert.alert('Plant Rotten!', `Your ${plot.plant.cropType} has rotten due to untreated infestation.`);
         return newPlots;
       });
     }, DECAY_TIME);
@@ -651,47 +651,49 @@ export const Taniman: React.FC<TanimanProps> = ({
       Alert.alert('Cannot Harvest', 'This plant has an infestation. Treat it with pesticide first.');
       return;
     }
+  
     if (plot.plant?.stage === 3) {
       const cropType = plot.plant.cropType as keyof typeof HARVEST_VALUES;
       let harvestValue = plot.plant.isRotted
-        ? HARVEST_VALUES[cropType].rotted
+        ? HARVEST_VALUES[cropType].rotten
         : HARVEST_VALUES[cropType].normal;
       if (plot.plant.isFertilized) harvestValue *= 2;
-
+  
       const uniqueTimestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 11);
       const uniqueCounter = (global.harvestCounter = (global.harvestCounter || 0) + 1);
       const uniqueId = plot.plant.isRotted
-        ? `rotted-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`
+        ? `rotten-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`
         : `normal-${cropType}-${uniqueTimestamp}-${uniqueCounter}-${randomPart}`;
-
+  
       const harvestedCrop: InventoryItem = {
         id: uniqueId,
-        title: `${plot.plant.isRotted ? 'Rotted ' : ''}${cropType}`,
+        title: `${plot.plant.isRotted ? 'Rotten ' : ''}${cropType}`,
         type: 'harvestedCrop',
         description: plot.plant.isRotted
-          ? `A rotted ${cropType} with reduced value.`
+          ? `A rotten ${cropType} with reduced value.`
           : `A freshly harvested ${cropType} ready to be sold.`,
         price: 0,
         sellPrice: harvestValue,
         image: plot.plant.image,
       };
-
+  
       setPlots((current) => {
         const newPlots = [...current];
         newPlots[row] = [...newPlots[row]];
         newPlots[row][col] = { isPlowed: false, isWatered: false, isFlooded: false, plant: undefined };
         return newPlots;
       });
-
+  
       clearPlotTimers(row, col);
       await savePlantsToFirebase();
       const userId = Firebase_Auth.currentUser?.uid;
-
+  
       if (userId) {
         const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
         const statsSnapshot = await get(userStatsRef);
         const currentStats = statsSnapshot.val() || { rottedHarvested: 0, normalHarvested: 0, itemsSold: 0 };
+        
         if (plot.plant.isRotted) {
           currentStats.rottedHarvested = (currentStats.rottedHarvested || 0) + 1;
         } else {
@@ -699,31 +701,60 @@ export const Taniman: React.FC<TanimanProps> = ({
         }
         await set(userStatsRef, currentStats);
       }
+  
+      // Track mission progress for harvesting
+      if (onMissionProgress) {
+        onMissionProgress('harvestCrop', { cropType });
+        
+        // Track specific crop types if needed
+        if (cropType === 'Santan') {
+          onMissionProgress('harvestCrop', { cropType: 'Santan' });
+        }
+        if (cropType === 'Mangga') {
+          onMissionProgress('harvestCrop', { cropType: 'Mangga' });
+        }
+        if (cropType === 'Gumamela') {
+          onMissionProgress('harvestCrop', { cropType: 'Gumamela' });
+        }
+        if (cropType === 'Orchids') {
+          onMissionProgress('harvestCrop', { cropType: 'Orchids' });
+        }
 
+      }
+  
       if (plot.plant.isRotted) {
         if (userId) {
           const rottedItemsRef = ref(Firebase_Database, `users/${userId}/rottedItems/${harvestedCrop.id}`);
           await set(rottedItemsRef, harvestedCrop);
-          Alert.alert('Harvest Complete!', `Rotted ${cropType} has been sent to compost.`);
+          Alert.alert('Harvest Complete!', `Rotten ${cropType} has been sent to compost.`);
         } else {
           onAddToDecompose(harvestedCrop);
-          Alert.alert('Harvest Complete!', `Rotted ${cropType} has been sent to compost. Sign in to save!`);
+          Alert.alert('Harvest Complete!', `Rotten ${cropType} has been sent to compost. Sign in to save!`);
         }
       } else {
         if (userId) {
           const normalItemsRef = ref(Firebase_Database, `users/${userId}/normalItems/${harvestedCrop.id}`);
           await set(normalItemsRef, harvestedCrop);
+          
+          // Track selling missions when adding to inventory
+          if (onMissionProgress) {
+            if (plot.plant.type === 'tree') {
+              onMissionProgress('sellTree', { item: harvestedCrop });
+            } else {
+              onMissionProgress('sellCrop', { item: harvestedCrop });
+            }
+          }
+          
           Alert.alert('Harvest Complete!', `${cropType} has been harvested and added to your inventory.`);
         } else {
           onAddToNormalInventory(harvestedCrop);
           Alert.alert('Harvest Complete!', `${cropType} has been harvested. Sign in to save!`);
         }
       }
-
+  
       onUpdateStatistics({ plantsGrown: 1 });
-      onMissionProgress?.('harvestCrop', { cropType });
       playTimedSound(require('@/assets/sound/harvesting.mp3'));
-
+  
       if (onComplete) onComplete();
       // if (isTutorialActive && tutorialStep === 11) {
       //   advanceTutorial();
@@ -862,7 +893,6 @@ export const Taniman: React.FC<TanimanProps> = ({
     //   Alert.alert('Tutorial', 'Please tap the top-left plot (0,0) to continue!');
     //   return;
     // }
-
     if (plot.isFlooded) {
       if (selectedItem.title === 'Regadera') {
         setPlots((current) => updatePlot(current, row, col, { isPlowed: false, isWatered: false, isFlooded: false, plant: undefined }));
@@ -916,6 +946,9 @@ export const Taniman: React.FC<TanimanProps> = ({
 
       case 'Itak':
         if (plot.plant && plot.plant.stage === 3) {
+          if (onMissionProgress) {
+            onMissionProgress('useTool', { tool: 'Itak' });
+          }
           handleHarvest(row, col, plot);
         } else {
           Alert.alert('Not Ready', 'This plant isn’t ready for harvest yet.');
@@ -983,7 +1016,22 @@ export const Taniman: React.FC<TanimanProps> = ({
           setPlots((current) => updatePlot(current, row, col, { plant: newPlant }));
           playTimedSound(require('@/assets/sound/plant.mp3'));
           onUseItem(selectedItem);
-          onMissionProgress?.('plantCrop', { cropType: selectedItem.title });
+          if (onMissionProgress) {
+            onMissionProgress('plantCrop', { cropType: selectedItem.title });
+            if (selectedItem.title === 'Santan') {
+              onMissionProgress('plantCrop', { cropType: 'Santan' });
+            }
+            if (selectedItem.title === 'Gumamela') {
+              onMissionProgress('plantCrop', { cropType: 'Gumamela' });
+            }
+            if (selectedItem.title === 'Orchids') {
+              onMissionProgress('plantCrop', { cropType: 'Orchids' });
+            }
+            if (selectedItem.title === 'Mangga') {
+              onMissionProgress('plantCrop', { cropType: 'Mangga' });
+            }
+          }
+          
           // if (isTutorialActive && tutorialStep === 6) {
           //   advanceTutorial();
           //   setPlots((current) => {
@@ -1010,7 +1058,7 @@ export const Taniman: React.FC<TanimanProps> = ({
         ...newPlots[row][col],
         plant: { ...newPlots[row][col].plant!, isRotted: true, hasInfestation: false },
       };
-      Alert.alert('Plant Rotted!', `Your ${plot.plant.cropType} has rotted due to untreated infestation.`);
+      Alert.alert('Plant Rotten!', `Your ${plot.plant.cropType} has rotten due to untreated infestation.`);
       return newPlots;
     });
   };

@@ -83,6 +83,9 @@ interface MissionProgress {
     soldTrees: number;             
     organicFertilizersCreated: number;
     plantedSantan: number;
+    plantedGumamela: number;
+    plantedOrchids: number;
+    plantedMangga: number;
   }>({
     wateredCrops: 0,
     plantedCrops: 0,
@@ -93,6 +96,9 @@ interface MissionProgress {
     soldTrees: 0,                   
     organicFertilizersCreated: 0,
     plantedSantan: 0,
+    plantedGumamela: 0,
+    plantedOrchids: 0,
+    plantedMangga: 0,
   });
   
   const [plots, setPlots] = useState<PlotStatus[][]>(
@@ -141,6 +147,9 @@ interface MissionProgress {
             soldTrees: progressData.soldTrees || 0,
             organicFertilizersCreated: progressData.organicFertilizersCreated || 0,
             plantedSantan: progressData.plantedSantan || 0,
+            plantedGumamela: progressData.plantedGumamela || 0,
+            plantedOrchids: progressData.plantedOrchids || 0,
+            plantedMangga: progressData.plantedMangga || 0,
           });
         } else {
           // Set default progress if nothing exists in Firebase
@@ -154,6 +163,9 @@ interface MissionProgress {
             soldTrees: 0,
             organicFertilizersCreated: 0,
             plantedSantan: 0,
+            plantedGumamela: 0,
+            plantedOrchids: 0,
+            plantedMangga: 0,
           });
         }
       } catch (error) {
@@ -170,74 +182,151 @@ interface MissionProgress {
       newProgress.usedTools = newProgress.usedTools || {};
       newProgress.plantedSantan = newProgress.plantedSantan || 0;
 
+      newProgress.plantedGumamela = newProgress.plantedGumamela || 0;
+      newProgress.plantedOrchids = newProgress.plantedOrchids || 0;
+      newProgress.plantedMangga = newProgress.plantedMangga || 0;
+  
+      // Log para i-debug ang action at details
+      console.log(`Processing action: ${action}, Details:`, details);
+  
       switch (action) {
         case 'waterCrop':
           newProgress.wateredCrops += 1;
+          console.log('Watered crops:', newProgress.wateredCrops);
           break;
+  
         case 'plantCrop':
           newProgress.plantedCrops += 1;
-        if (details.cropType === 'Santan') {
-          newProgress.plantedSantan += 1;
-          console.log(`Planted Santan, Count: ${newProgress.plantedSantan}`);
-        }
+          console.log('Total planted crops:', newProgress.plantedCrops);
+
+          // Track specific crop types
+          if (details.cropType === 'Santan') {
+            newProgress.plantedSantan += 1;
+            console.log('Planted Santan:', newProgress.plantedSantan);
+          } else if (details.cropType === 'Gumamela') {
+            newProgress.plantedGumamela += 1;
+            console.log('Planted Gumamela:', newProgress.plantedGumamela);
+          } else if (details.cropType === 'Orchids') {
+            newProgress.plantedOrchids += 1;
+            console.log('Planted Orchids:', newProgress.plantedOrchids);
+          } else if (details.cropType === 'Mangga') {
+            newProgress.plantedMangga += 1;
+            console.log('Planted Mangga:', newProgress.plantedMangga);
+          }
           break;
+  
         case 'harvestCrop':
           newProgress.harvestedCrops += 1;
+          console.log('Harvested crops:', newProgress.harvestedCrops);
           break;
+  
         case 'useTool':
           newProgress.usedTools[details.tool] = (newProgress.usedTools[details.tool] || 0) + 1;
+          console.log(`Used tool ${details.tool}:`, newProgress.usedTools[details.tool]);
           break;
+  
         case 'useFertilizer':
           newProgress.usedFertilizers[details.type] = (newProgress.usedFertilizers[details.type] || 0) + 1;
+          console.log(`Used fertilizer ${details.type}:`, newProgress.usedFertilizers[details.type]);
           break;
+  
         case 'sellCrop':
           newProgress.soldCrops = (newProgress.soldCrops || 0) + 1;
+          console.log('Sold crops:', newProgress.soldCrops);
           break;
+  
         case 'sellTree':
           newProgress.soldTrees = (newProgress.soldTrees || 0) + 1;
+          console.log('Sold trees:', newProgress.soldTrees);
           break;
+  
         case 'createOrganicFertilizer':
           newProgress.organicFertilizersCreated = (newProgress.organicFertilizersCreated || 0) + 1;
+          console.log('Organic fertilizers created:', newProgress.organicFertilizersCreated);
           break;
       }
-
+      
       // Check mission completion
       const updatedMissions = missions.map(mission => {
         if (mission.completed) return mission;
+  
         let isComplete = false;
+  
+        // Generic watering missions
         if (mission.title.includes('Mag Dilig ng') && mission.title.match(/(\d+)/)) {
           const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
           isComplete = newProgress.wateredCrops >= required;
-        } else if (mission.title.includes('Mag tanim ng Santan') && mission.title.match(/(\d+)/)) {
-          const required = parseInt(mission.title.match(/(\d+)/)![1], 10);
-          console.log(`Santan required: ${required}, Current: ${newProgress.plantedSantan}`);
-          isComplete = newProgress.plantedSantan >= required;
-        } else if (mission.title === 'Gumamit ng Asarol') {
+        } 
+        // Generic planting mission
+        else if (mission.title === 'Mag tanim ng Crops') {
+          isComplete = newProgress.plantedCrops >= 1;
+        }
+        // Mangga-specific planting mission
+        else if (mission.title === 'Mag tanim ng Mangga') {
+          isComplete = details?.cropType === 'Mangga' && newProgress.plantedCrops >= 1;
+        }
+        // Tool usage missions
+        else if (mission.title === 'Gumamit ng Asarol') {
           isComplete = (newProgress.usedTools['Asarol'] || 0) >= 1;
-        } else if (mission.title === 'Gumamit ng Synthetic Fertilizer') {
+        } 
+        // Fertilizer usage missions
+        else if (mission.title === 'Gumamit ng Synthetic Fertilizer') {
           isComplete = (newProgress.usedFertilizers['Synthetic Fertilizer'] || 0) >= 1;
-        } else if (mission.title === 'Gumamit ng Organic Fertilizer') {
+        } 
+        else if (mission.title === 'Gumamit ng Organic Fertilizer') {
           isComplete = (newProgress.usedFertilizers['Organic Fertilizer'] || 0) >= 1;
-        } else if (mission.title === 'Mag tanim ng') {
-          isComplete = newProgress.plantedCrops >= 1 && details.cropType === 'Mangga'; 
-        }else if (mission.title === 'Mag Benta ng Crops') {
+        } 
+        // Chemical Pesticide
+        else if (mission.title === 'Gumamit ng Chemical Pesticide') {
+          isComplete = (newProgress.usedTools['Chemical Pesticide'] || 0) >= 1;
+        }
+        // Gumamit ng Itak
+        else if (mission.title === 'Gumamit ng Itak') {
+          isComplete = (newProgress.usedTools['Itak'] || 0) >= 1;
+        }
+        // Mag Tanim ng Santan
+        else if (mission.title === 'Mag tanim ng Santan') {
+          isComplete = newProgress.plantedSantan >= 1;
+        }
+        // Mag Tanim ng Gummamela
+        else if (mission.title === 'Mag tanim ng Gumamela') {
+          isComplete = newProgress.plantedGumamela >= 1;
+        }
+        // Mag Tanim ng Orchids
+        else if (mission.title === 'Mag tanim ng Orchids') {
+          isComplete = newProgress.plantedOrchids >= 1;
+        }
+        // Selling missions
+        else if (mission.title === 'Mag Benta ng Crops') {
           isComplete = (newProgress.soldCrops || 0) >= 1;
-        } else if (mission.title === 'Mag Benta ng Tree') {
+        } 
+        else if (mission.title === 'Mag Benta ng Prutas') {
           isComplete = (newProgress.soldTrees || 0) >= 1;
-        } else if (mission.title === 'Gumawa ng Organic Fertilizer') {
+        } 
+        // Organic fertilizer creation mission
+        else if (mission.title === 'Gumawa ng Organic Fertilizer') {
           isComplete = (newProgress.organicFertilizersCreated || 0) >= 1;
         }
+        if (isComplete) {
+          console.log(`Mission completed: ${mission.title}`);
+        }
+  
         return isComplete ? { ...mission, completed: true } : mission;
       });
-
+  
+      // Update state and Firebase
       setMissions(updatedMissions);
       if (params.uid) {
         update(ref(Firebase_Database, `users/${params.uid}`), {
           missions: updatedMissions,
           missionProgress: newProgress,
+        }).then(() => {
+          console.log('Mission progress saved to Firebase:', newProgress);
+        }).catch(error => {
+          console.error('Error saving mission progress:', error);
         });
       }
-
+  
       return newProgress;
     });
   };

@@ -51,7 +51,6 @@ export const BagModal = ({
   };
 
   useEffect(() => {
-    console.log('BagModal - Current inventory:', inventory);
   }, [inventory]);
 
   const handleSellItem = (item: InventoryItem) => {
@@ -74,7 +73,6 @@ export const BagModal = ({
         {
           text: "Sell",
           onPress: () => {
-            console.log('Selling item:', item.title);
             onSellItem(item);
             // Clear selection if the sold item was selected
             if (selectedItem?.id === item.id) {
@@ -87,7 +85,6 @@ export const BagModal = ({
   };
 
   const handleUseItem = (item: InventoryItem) => { 
-    console.log('Using Item BagModal: ', item);
     onSelectItem(item);
     onClose();
     
