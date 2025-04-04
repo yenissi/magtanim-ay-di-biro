@@ -57,7 +57,7 @@ const HARVEST_VALUES = {
 
 const INFESTATION_CHANCE = 0.01;
 const INFESTATION_CHECK_INTERVAL = 10000;
-const DECAY_TIME = 30000;
+const DECAY_TIME = 300000;
 const FERTILIZER_GROWTH_MULTIPLIER = 0.5;
 const DROUGHT_CHANCE = 0.01;
 const DROUGHT_CHECK_INTERVAL = 10000;
@@ -371,28 +371,35 @@ export const Taniman: React.FC<TanimanProps> = ({
     drought: {},
   });
 
-  const formatTime = (seconds: number) => {
+  const formatTime = (seconds?: number) => {
+    if (seconds === undefined || seconds < 0) return "0:00";
     const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
+    const remainingSeconds = seconds % 60;
     return `${minutes}:${remainingSeconds < 10 ? '0' : ''}${remainingSeconds}`;
   };
 
   useEffect(() => {
     const interval = setInterval(() => {
-      const now = new Date().getTime();
+      const now = new Date().getTime(); // Get current time in milliseconds
       const newTimers = { growth: {}, decay: {}, drought: {} };
-
+  
       plots.forEach((row, rowIndex) => {
         row.forEach((plot, colIndex) => {
           const plotId = `${rowIndex}-${colIndex}`;
           if (plot.plant) {
             if (plot.plant.stage < 3) {
-              const timeRemaining = Math.max(0, plot.plant.readyAt.getTime() - now);
+              const timeRemaining = Math.max(
+                0,
+                Math.floor((plot.plant.readyAt.getTime() - now) / 1000) // Convert to seconds
+              );
               newTimers.growth[plotId] = timeRemaining;
             }
             if (plot.plant.hasInfestation && !plot.plant.isRotted) {
               const infestationStartTime = plot.plant.readyAt.getTime();
-              const decayTimeRemaining = Math.max(0, infestationStartTime + DECAY_TIME - now);
+              const decayTimeRemaining = Math.max(
+                0,
+                Math.floor((infestationStartTime + DECAY_TIME - now) / 1000) // Convert to seconds
+              );
               newTimers.decay[plotId] = decayTimeRemaining;
               if (decayTimeRemaining === 0 && plot.plant.hasInfestation) {
                 handlePlantDecay(rowIndex, colIndex);
@@ -400,7 +407,10 @@ export const Taniman: React.FC<TanimanProps> = ({
             }
             if (plot.plant.needsWater && !plot.plant.isRotted) {
               const droughtStartTime = plot.plant.readyAt.getTime();
-              const droughtTimeRemaining = Math.max(0, droughtStartTime + DROUGHT_DECAY_TIME - now);
+              const droughtTimeRemaining = Math.max(
+                0,
+                Math.floor((droughtStartTime + DROUGHT_DECAY_TIME - now) / 1000) // Convert to seconds
+              );
               newTimers.drought[plotId] = droughtTimeRemaining;
               if (droughtTimeRemaining === 0 && plot.plant.needsWater) {
                 handleDroughtDamage(rowIndex, colIndex);
@@ -409,10 +419,10 @@ export const Taniman: React.FC<TanimanProps> = ({
           }
         });
       });
-
+  
       setTimers(newTimers);
     }, 1000);
-
+  
     return () => clearInterval(interval);
   }, [plots]);
 
@@ -814,13 +824,13 @@ export const Taniman: React.FC<TanimanProps> = ({
   const loadPlantsFromFirebase = async () => {
     const userId = Firebase_Auth.currentUser?.uid;
     if (!userId) return false;
-
+  
     try {
       const plotsRef = ref(Firebase_Database, `users/${userId}/plots`);
       const snapshot = await get(plotsRef);
       const savedPlots = snapshot.val();
       if (!savedPlots) return false;
-
+  
       clearAllTimers();
       const deserializedPlots = savedPlots.map((row) =>
         row.map((plot) => {
@@ -844,20 +854,48 @@ export const Taniman: React.FC<TanimanProps> = ({
           return newPlot;
         })
       );
-      setPlots(deserializedPlots);
+  
+      // Initialize timers object
+      const initialTimers = { growth: {}, decay: {}, drought: {} };
+      const now = Date.now();
+  
+      // Populate timers and restart checks
       deserializedPlots.forEach((row, rowIndex) => {
         row.forEach((plot, colIndex) => {
-          startFloodCheck(rowIndex, colIndex);
+          const plotId = `${rowIndex}-${colIndex}`; // Define plotId here
+          startFloodCheck(rowIndex, colIndex); // Start flood check for all plots
           if (plot.plant) {
+            if (plot.plant.stage < 3) {
+              initialTimers.growth[plotId] = Math.max(
+                0,
+                Math.floor((plot.plant.readyAt.getTime() - now) / 1000)
+              );
+            }
             if (plot.plant.stage === 3 && !plot.plant.isRotted) {
               startInfestationCheck(rowIndex, colIndex);
               startDroughtCheck(rowIndex, colIndex);
-              if (plot.plant.hasInfestation) startDecayTimer(rowIndex, colIndex);
-              if (plot.plant.needsWater) startDroughtDecayTimer(rowIndex, colIndex);
+            }
+            if (plot.plant.hasInfestation) {
+              initialTimers.decay[plotId] = Math.max(
+                0,
+                Math.floor((plot.plant.readyAt.getTime() + DECAY_TIME - now) / 1000)
+              );
+              startDecayTimer(rowIndex, colIndex);
+            }
+            if (plot.plant.needsWater) {
+              initialTimers.drought[plotId] = Math.max(
+                0,
+                Math.floor((plot.plant.readyAt.getTime() + DROUGHT_DECAY_TIME - now) / 1000)
+              );
+              startDroughtDecayTimer(rowIndex, colIndex);
             }
           }
         });
       });
+  
+      // Set the plots and timers state
+      setPlots(deserializedPlots);
+      setTimers(initialTimers); // Update the component's timer state
       return true;
     } catch (error) {
       console.error('Error loading plots from Firebase:', error);
@@ -1000,12 +1038,13 @@ export const Taniman: React.FC<TanimanProps> = ({
             return;
           }
           const cropType = selectedItem.title as keyof typeof GROWTH_TIMES;
+          const growthTime = GROWTH_TIMES[cropType];
           const newPlant: PlantData = {
             id: Math.random().toString(),
             stage: 0,
             type: selectedItem.type,
             plantedAt: new Date(),
-            readyAt: new Date(Date.now() + GROWTH_TIMES[cropType]),
+            readyAt: new Date(Date.now() + growthTime),
             cropType: selectedItem.title,
             image: selectedItem.image,
             hasInfestation: false,
@@ -1014,6 +1053,10 @@ export const Taniman: React.FC<TanimanProps> = ({
             needsWater: false,
           };
           setPlots((current) => updatePlot(current, row, col, { plant: newPlant }));
+          setTimers((prev) => ({
+            ...prev,
+            growth: { ...prev.growth, [`${row}-${col}`]: Math.floor(growthTime / 1000) },
+          }));
           playTimedSound(require('@/assets/sound/plant.mp3'));
           onUseItem(selectedItem);
           if (onMissionProgress) {
@@ -1161,17 +1204,17 @@ export const Taniman: React.FC<TanimanProps> = ({
                     <View className="absolute bottom-0 left-0 right-0">
                       {plot.plant.stage < 3 && (
                         <Text className="text-black text-[7px] font-medium text-right">
-                          {formatTime(timers.growth[`${rowIndex}-${colIndex}`] / 1000)}
+                          {formatTime(timers.growth[`${rowIndex}-${colIndex}`])}
                         </Text>
                       )}
                       {plot.plant.hasInfestation && !plot.plant.isRotted && (
                         <Text className="text-red text-[7px] font-medium text-right">
-                          {formatTime(timers.decay[`${rowIndex}-${colIndex}`] / 1000)}
+                          {formatTime(timers.decay[`${rowIndex}-${colIndex}`])}
                         </Text>
                       )}
                       {plot.plant.needsWater && !plot.plant.isRotted && (
                         <Text className="text-blue text-[7px] font-medium text-right">
-                          {formatTime(timers.drought[`${rowIndex}-${colIndex}`] / 1000)}
+                          {formatTime(timers.drought[`${rowIndex}-${colIndex}`])}
                         </Text>
                       )}
                     </View>

@@ -162,8 +162,8 @@ export const INITIAL_GAME_STATE = {
         id: 14,
         title: "Mag Benta ng Crops",
         questions:{
-          tagalog: "Bakit mahalaga ang magkaroon ng regular na suplay ng prutas sa merkado?",
-          english: "Why is it important to maintain a consistent supply of fruit in the market?",
+          tagalog: "Paano maaaring pagkakitaan ng mga pamilya ang mga halamang ornamental?",
+          english: "How can ornamental plants be used as a source of income for families",
         },
         reward: 20,
         locked: false,
@@ -186,8 +186,8 @@ export const INITIAL_GAME_STATE = {
         id: 16,
         title: "Mag Benta ng Mangga",
         questions: {
-          tagalog: "Paano maaaring pagkakitaan ng mga pamilya ang mga halamang ornamental?",
-          english: "How can ornamental plants be used as a source of income for families",
+          tagalog: "Bakit mahalaga ang magkaroon ng regular na suplay ng prutas sa merkado?",
+          english: "Why is it important to maintain a consistent supply of fruit in the market?",
         },
         reward: 20,
         locked: false,

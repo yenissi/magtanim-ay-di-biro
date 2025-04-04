@@ -12,6 +12,7 @@ import {
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import * as ScreenOrientation from 'expo-screen-orientation';
 import { SimpleLineIcons } from '@expo/vector-icons';
+
 import { signOut } from 'firebase/auth';
 import { ref, update, increment, onValue,get } from 'firebase/database';
 import { Firebase_Auth, Firebase_Database } from '@/firebaseConfig';

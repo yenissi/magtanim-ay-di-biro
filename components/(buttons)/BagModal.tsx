@@ -17,14 +17,14 @@ interface BagModalProps {
   selectedItem: InventoryItem | null;
   onSellItem: (item: InventoryItem) => void;
   onUseItem: (item: InventoryItem) => void;
-  onRemoveItem: (itemId: string) => void; 
+  onRemoveItem: (itemId: string) => void;
   plots: PlotStatus[][];
   onAddToInventory: (item: InventoryItem) => void;
 }
 
-export const BagModal = ({ 
-  visible, 
-  onClose, 
+export const BagModal = ({
+  visible,
+  onClose,
   inventory = [],
   onSelectItem,
   selectedItem,
@@ -34,23 +34,14 @@ export const BagModal = ({
   plots,
   onAddToInventory
 }: BagModalProps) => {
-
   const safeInventory = Array.isArray(inventory) ? inventory : [];
-  
+
   useEffect(() => {
     if (Array.isArray(inventory) && inventory.length > 0) {
       console.log('', inventory.map(item => ({
         title: item.title,
       })));
-    } else {
     }
-  }, [inventory]);
-
-  const handleItemUse = (item: InventoryItem) => {
-    onUseItem(item);
-  };
-
-  useEffect(() => {
   }, [inventory]);
 
   const handleSellItem = (item: InventoryItem) => {
@@ -58,23 +49,19 @@ export const BagModal = ({
       Alert.alert("Cannot Sell", "This essential tool cannot be sold.");
       return;
     }
-    
+
     const sellQuantity = item.quantity && item.quantity > 1 ? 1 : 1;
     const totalPrice = (item.sellPrice || 0) * sellQuantity;
-    
+
     Alert.alert(
       "Sell Item",
       `Are you sure you want to sell ${sellQuantity} ${item.title} for ${totalPrice} coins?`,
       [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
+        { text: "Cancel", style: "cancel" },
         {
           text: "Sell",
           onPress: () => {
             onSellItem(item);
-            // Clear selection if the sold item was selected
             if (selectedItem?.id === item.id) {
               onSelectItem(null);
             }
@@ -84,65 +71,35 @@ export const BagModal = ({
     );
   };
 
-  const handleUseItem = (item: InventoryItem) => { 
-    onSelectItem(item);
-    onClose();
-    
-    // For consumable items, ONLY check if they're valid to use, but don't consume yet
-    const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
-    if (!nonConsumableTools.includes(item.title)) {
-      // Only remove consumable items
-      const nonConsumableTools = ['Itak', 'Regadera', 'Asarol'];
-      if (!nonConsumableTools.includes(item.title)) {
-        // Determine what the item does first
-        if (item.title === 'Fertilizer' || item.title === 'Organic Fertilizer') {
-          const hasActivePlant = plots.some(row => 
-            row.some(plot => plot.plant && !plot.plant.isFertilized)
-          );
-          
-          if (!hasActivePlant) {
-            return; // Don't remove the item if it can't be used
-          }
-          
-          Alert.alert(
-            "Apply Fertilizer",
-            "Select a plot with a plant to apply fertilizer.",
-            [{ text: "OK" }]
-          );
-        } else if (item.type === 'crop' || item.type === 'tree') {
-          const hasAvailablePlot = plots.some(row => 
-            row.some(plot => plot.isPlowed && plot.isWatered && !plot.plant)
-          );
-          
-          if (!hasAvailablePlot) {
-            return;
-          }
-          
-          Alert.alert(
-            "Plant Seeds",
-            "Select a plowed and watered plot to plant these seeds.",
-            [{ text: "OK" }]
-          );
-        }
-      }
+  const handleToggleSelect = (item: InventoryItem) => {
+    if (selectedItem?.id === item.id) {
+      // If the item is already selected, unselect it
+      onSelectItem(null);
+    } else {
+      // Select the item
+      onSelectItem(item);
     }
   };
 
   const renderItemActions = (item: InventoryItem) => {
+    const isSelected = selectedItem?.id === item.id;
+
     if (item.title === '' || item.title === 'Itak') {
+      // Tools like Itak only have Select/Unselect
       return (
         <TouchableOpacity
-          className="rounded-lg p-2 w-full bg-green-400"
-          onPress={() => handleUseItem(item)}
+          className={`rounded-lg p-2 w-full ${isSelected ? 'bg-red-400' : 'bg-green-400'}`}
+          onPress={() => handleToggleSelect(item)}
         >
           <Text className="text-sm font-medium text-center text-white">
-            Use
+            {isSelected ? 'Unselect' : 'Select'}
           </Text>
         </TouchableOpacity>
       );
     }
-    // Special handling for harvested crops
+
     if (item.type === 'harvestedCrop') {
+      // Harvested crops keep the Sell button
       return (
         <TouchableOpacity
           className="rounded-lg p-2 w-full bg-blue-400"
@@ -155,14 +112,14 @@ export const BagModal = ({
       );
     }
 
-    // For consumable items like seeds, fertilizer, etc.
+    // Consumable items (seeds, fertilizer, etc.) get Select/Unselect
     return (
       <TouchableOpacity
-        className="rounded-lg p-2 w-full bg-green-400"
-        onPress={() => handleUseItem(item)}
+        className={`rounded-lg p-2 w-full ${isSelected ? 'bg-red-400' : 'bg-green-400'}`}
+        onPress={() => handleToggleSelect(item)}
       >
         <Text className="text-sm font-medium text-center text-white">
-          Use
+          {isSelected ? 'Unselect' : 'Select'}
         </Text>
       </TouchableOpacity>
     );
@@ -183,19 +140,19 @@ export const BagModal = ({
             {safeInventory.length === 0 ? (
               <Text className="text-center text-gray-600 p-4">Your bag is empty</Text>
             ) : (
-                <View className="flex-row flex-wrap gap-4">
-                  {safeInventory.map((item, index) => (
-                    <View 
-                      key={`${item?.id || 'unknown'}-${index}`} 
-                      className={`rounded-lg p-3 w-40 ${
-                        selectedItem?.id === item?.id 
-                          ? 'bg-yellow-300 border-2 border-amber-500' 
-                          : 'bg-yellow-200'
-                      }`}
-                    >
+              <View className="flex-row flex-wrap gap-4">
+                {safeInventory.map((item, index) => (
+                  <View
+                    key={`${item?.id || 'unknown'}-${index}`}
+                    className={`rounded-lg p-3 w-40 ${
+                      selectedItem?.id === item?.id
+                        ? 'bg-yellow-300 border-2 border-amber-500'
+                        : 'bg-yellow-200'
+                    }`}
+                  >
                     <View className="items-center mb-2">
-                      <Image 
-                        source={item?.image} 
+                      <Image
+                        source={item?.image}
                         className="w-16 h-16"
                         resizeMode="contain"
                       />
@@ -204,7 +161,6 @@ export const BagModal = ({
                     {item?.quantity && item.quantity > 1 && (
                       <Text className="font-bold mb-1 text-center text-gray-700">Qty: {item.quantity}</Text>
                     )}
-                    {/* <Text className="text-xs text-gray-600 mb-2 text-center">{item?.type || ''}</Text> */}
                     <View className="flex-row items-center gap-1">
                       {item && renderItemActions(item)}
                     </View>

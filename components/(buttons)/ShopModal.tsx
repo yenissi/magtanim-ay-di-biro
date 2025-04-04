@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, Modal, TouchableOpacity, ScrollView, Alert, Image, Animated } from 'react-native';
+import { View, Text, Modal, TouchableOpacity, ScrollView, Alert, Image, Animated, TextInput } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import { getDatabase, ref, update, get } from 'firebase/database';
 import { SHOP_ITEMS } from '@/config/gameConfig';
@@ -16,11 +16,13 @@ interface ShopModalProps {
 
 interface FlipCardProps {
   item: any;
-  onPurchase: (itemId: number, price: number) => void;
+  onPurchase: (itemId: number, price: number, quantity: number) => void; // Updated to include quantity
 }
 
 const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
   const [isFlipped, setIsFlipped] = useState(false);
+  const [quantityModalVisible, setQuantityModalVisible] = useState(false); // For quantity selection
+  const [quantity, setQuantity] = useState('1'); // Default quantity
   const flipAnim = React.useRef(new Animated.Value(0)).current;
 
   const frontInterpolate = flipAnim.interpolate({
@@ -33,186 +35,188 @@ const FlipCard = ({ item, onPurchase }: FlipCardProps) => {
     outputRange: ['180deg', '360deg'],
   });
 
-  const frontAnimatedStyle = {
-    transform: [{ rotateY: frontInterpolate }]
-  };
-
-  const backAnimatedStyle = {
-    transform: [{ rotateY: backInterpolate }]
-  };
+  const frontAnimatedStyle = { transform: [{ rotateY: frontInterpolate }] };
+  const backAnimatedStyle = { transform: [{ rotateY: backInterpolate }] };
 
   const flipCard = () => {
-    if (isFlipped) {
-      Animated.spring(flipAnim, {
-        toValue: 0,
-        friction: 8,
-        tension: 10,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      Animated.spring(flipAnim, {
-        toValue: 180,
-        friction: 8,
-        tension: 10,
-        useNativeDriver: true,
-      }).start();
-    }
+    Animated.spring(flipAnim, {
+      toValue: isFlipped ? 0 : 180,
+      friction: 8,
+      tension: 10,
+      useNativeDriver: true,
+    }).start();
     setIsFlipped(!isFlipped);
   };
 
   const handleBuyPress = (event: any) => {
     event.stopPropagation();
-    onPurchase(item.id, item.price);
+    if (item.type.toLowerCase() === 'crop' || item.type.toLowerCase() === 'tree') {
+      setQuantityModalVisible(true); // Show quantity modal for crops
+    } else {
+      onPurchase(item.id, item.price, 1); // Default to 1 for non-crops
+    }
   };
 
-  const handleInfoPress = (event: any) => {
-    event.stopPropagation();
-    flipCard();
-  };
-
-  const handleBackPress = (event: any) => {
-    event.stopPropagation();
-    flipCard();
+  const confirmPurchase = () => {
+    const qty = parseInt(quantity) || 1;
+    if (qty <= 0) {
+      Alert.alert("Invalid Quantity", "Please enter a valid quantity.");
+      return;
+    }
+    onPurchase(item.id, item.price, qty);
+    setQuantityModalVisible(false);
+    setQuantity('1'); // Reset quantity
   };
 
   return (
     <View className="w-40 h-[200px]">
-      <Animated.View 
+      {/* Front Side */}
+      <Animated.View
         style={[
-          { 
-            backfaceVisibility: 'hidden',
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-          },
-          frontAnimatedStyle
+          { backfaceVisibility: 'hidden', position: 'absolute', width: '100%', height: '100%' },
+          frontAnimatedStyle,
         ]}
         className="bg-yellow-200 rounded-lg p-4"
       >
         {item.image && (
-          <Image 
-            source={item.image} 
-            className="w-16 h-16 self-center mb-2" 
-            resizeMode="contain" 
-          />
+          <Image source={item.image} className="w-16 h-16 self-center mb-2" resizeMode="contain" />
         )}
         <Text className="font-bold mb-2 text-[16px]">{item.title}</Text>
         <Text className="text-green-600 font-bold mb-4 text-[13px]">₱ {item.price}.00</Text>
-        <View className='flex-row items-center gap-3'>
-          <TouchableOpacity 
+        <View className="flex-row items-center gap-3">
+          <TouchableOpacity
             className="bg-green-400 rounded-lg p-2 w-20 items-center"
-            onPress={() => {
-              onPurchase(item.id, item.price);
-            }}>
+            onPress={handleBuyPress}
+          >
             <Text className="font-bold">Buy</Text>
           </TouchableOpacity>
-          <TouchableOpacity 
-            className='p-1 rounded-lg bg-blue-300 items-center'
-            onPress={flipCard}>
-            <AntDesign name='info' size={24} color="black" />
+          <TouchableOpacity
+            className="p-1 rounded-lg bg-blue-300 items-center"
+            onPress={flipCard}
+          >
+            <AntDesign name="info" size={24} color="black" />
           </TouchableOpacity>
         </View>
       </Animated.View>
 
-      <Animated.View 
-        style={[
-          {
-            backfaceVisibility: 'hidden',
-            position: 'absolute',
-            width: '100%',
-          },
-          backAnimatedStyle
-        ]}
->
+      {/* Back Side */}
+      <Animated.View
+        style={[{ backfaceVisibility: 'hidden', position: 'absolute', width: '100%' }, backAnimatedStyle]}
+      >
         <Text className="font-bold mb-2 text-[16px]">Description</Text>
         <Text className="text-gray-600 mb-4 text-sm">{item.description}</Text>
-        <TouchableOpacity 
-          className="bg-blue-400 rounded-lg p-2 items-center mt-auto"
-          onPress={flipCard}
-        >
+        <TouchableOpacity className="bg-blue-400 rounded-lg p-2 items-center mt-auto" onPress={flipCard}>
           <Text className="font-bold">Back</Text>
         </TouchableOpacity>
       </Animated.View>
+
+      {/* Quantity Selection Modal (for crops) */}
+      {(item.type.toLowerCase() === 'crop' || item.type.toLowerCase() === 'tree') && (
+        <Modal visible={quantityModalVisible} transparent animationType="fade">
+          <View className="flex-1 justify-center items-center bg-black/50">
+            <View className="bg-orange-300 p-5 rounded-lg w-[250px]">
+              <Text className="text-lg font-bold mb-4">How many {item.title}?</Text>
+              <TextInput
+                className="border border-gray-400 rounded-lg p-2 mb-4"
+                keyboardType="numeric"
+                value={quantity}
+                onChangeText={setQuantity}
+                placeholder="Enter quantity"
+              />
+              <View className="flex-row justify-between">
+                <TouchableOpacity
+                  className="bg-green-400 rounded-lg p-2 items-center"
+                  onPress={confirmPurchase}
+                >
+                  <Text className="font-bold text-[13px]">Confirm</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  className="bg-red-400 rounded-lg p-2 w-20 items-center"
+                  onPress={() => setQuantityModalVisible(false)}
+                >
+                  <Text className="font-bold text-[13px]">Cancel</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
 
 const TABS = ['All', 'Tool', 'Crop', 'Tree'];
 
-export const ShopModal = ({ 
-  visible, 
-  onClose, 
-  uid, 
-  userMoney, 
-  onPurchase, 
+export const ShopModal = ({
+  visible,
+  onClose,
+  uid,
+  userMoney,
+  onPurchase,
   purchasedTools = [],
-  onUpdatePurchasedTools 
+  onUpdatePurchasedTools,
 }: ShopModalProps) => {
-
   const [selectedTab, setSelectedTab] = useState('All');
   const oneTimeTools = ['Itak', 'Regadera', 'Asarol'];
 
   const displayItems = selectedTab === 'All'
     ? SHOP_ITEMS.filter(item => !oneTimeTools.includes(item.title) || !purchasedTools.includes(item.title))
-    : SHOP_ITEMS.filter(item => 
-        item.type.toLowerCase() === selectedTab.toLowerCase() && 
+    : SHOP_ITEMS.filter(item =>
+        item.type.toLowerCase() === selectedTab.toLowerCase() &&
         (!oneTimeTools.includes(item.title) || !purchasedTools.includes(item.title))
       );
 
-    const handlePurchase = async (itemId: number, price: number) => {
-      if (userMoney < price) {
-        Alert.alert("Insufficient Funds", "You don't have enough money for this purchase.");
+  const handlePurchase = async (itemId: number, price: number, quantity: number) => {
+    const totalPrice = price * quantity;
+    if (userMoney < totalPrice) {
+      Alert.alert("Insufficient Funds", `You need ₱${totalPrice}.00 to buy ${quantity} item(s).`);
+      return;
+    }
+
+    const db = getDatabase();
+    const userRef = ref(db, `users/${uid}`);
+    try {
+      const snapshot = await get(userRef);
+      if (!snapshot.exists()) return;
+
+      const userData = snapshot.val();
+      const inventory = Array.isArray(userData.inventory) ? userData.inventory : [];
+      const item = SHOP_ITEMS.find(item => item.id === itemId);
+
+      if (!item) {
+        console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
         return;
       }
-      const db = getDatabase();
-      const userRef = ref(db, `users/${uid}`);
-      try {
-        const snapshot = await get(userRef);
-        if (!snapshot.exists()) return;
-    
-        const userData = snapshot.val();
-        const inventory = Array.isArray(userData.inventory) ? userData.inventory : [];
-        const item = SHOP_ITEMS.find(item => item.id === itemId);
-        
-        // Find the item to purchase
-        if (!item) {
-          console.log(`Item with ID: ${itemId} not found in SHOP_ITEMS.`);
-          return;
-        }
-        const existingItemIndex = inventory.findIndex(i => i.id === itemId); 
-        let updatedInventory;
 
-        if (oneTimeTools.includes(item.title)) {
-        // For one-time purchase tools
+      const existingItemIndex = inventory.findIndex(i => i.id === itemId);
+      let updatedInventory;
+
+      if (oneTimeTools.includes(item.title)) {
+        // For one-time purchase tools (quantity remains 1)
         updatedInventory = [...inventory, { ...item, quantity: 1, isOneTime: true }];
         const newPurchasedTools = [...purchasedTools, item.title];
         onUpdatePurchasedTools?.(newPurchasedTools);
-        
+
         await update(userRef, {
-          money: userData.money - price,
+          money: userData.money - price, // Only one tool, so price isn't multiplied
           inventory: updatedInventory,
-          purchasedTools: newPurchasedTools // Store in Firebase
+          purchasedTools: newPurchasedTools,
         });
       } else {
-        // Existing logic for other items
+        // For crops or other items with quantity
         if (existingItemIndex !== -1) {
           updatedInventory = [...inventory];
-          if (!updatedInventory[existingItemIndex].quantity) {
-            updatedInventory[existingItemIndex] = {
-              ...updatedInventory[existingItemIndex],
-              quantity: 1
-            };
-          }
-          updatedInventory[existingItemIndex].quantity += 1;
+          updatedInventory[existingItemIndex].quantity =
+            (updatedInventory[existingItemIndex].quantity || 0) + quantity;
         } else {
-          updatedInventory = [...inventory, { ...item, quantity: 1 }];
-        } 
+          updatedInventory = [...inventory, { ...item, quantity }];
+        }
         await update(userRef, {
-          money: userData.money - price,
+          money: userData.money - totalPrice,
           inventory: updatedInventory,
         });
       }
-      Alert.alert("Success", `${item.title} purchased successfully!`);
+      Alert.alert("Success", `${quantity} ${item.title}(s) purchased successfully!`);
       onPurchase();
     } catch (error) {
       console.error("Purchase error:", error);
@@ -223,19 +227,18 @@ export const ShopModal = ({
   return (
     <Modal visible={visible} transparent animationType="fade">
       <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-orange-300 p-5 rounded-t-lg w-11/12 flex-row justify-between items-center">
-            <Text className="text-lg font-bold">Shop</Text>
-            <TouchableOpacity onPress={onClose}>
-              <AntDesign name="close" size={24} color="black" />
-            </TouchableOpacity>
-          </View>
+        <View className="bg-orange-300 p-5 rounded-t-lg w-11/12 flex-row justify-between items-center">
+          <Text className="text-lg font-bold">Shop</Text>
+          <TouchableOpacity onPress={onClose}>
+            <AntDesign name="close" size={24} color="black" />
+          </TouchableOpacity>
+        </View>
         <View className="bg-orange-300 p-5 rounded-b-lg w-11/12 flex-row">
-
           {/* Tabs on the Left Side */}
           <View className="mr-2 w-1/5">
             {TABS.map(tab => (
-              <TouchableOpacity 
-                key={tab} 
+              <TouchableOpacity
+                key={tab}
                 className={`p-3 mb-2 border border-black rounded-lg ${selectedTab === tab ? 'bg-blue-500' : 'bg-white-300'}`}
                 onPress={() => setSelectedTab(tab)}
               >
@@ -243,7 +246,7 @@ export const ShopModal = ({
               </TouchableOpacity>
             ))}
           </View>
-          
+
           {/* Filtered Items */}
           <ScrollView horizontal>
             <View className="flex-row gap-4">

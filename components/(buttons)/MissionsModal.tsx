@@ -99,6 +99,9 @@ export const MissionsModal = ({
   };
 
   const handleCompleteMission = (mission: Mission) => {
+    if (answeredMissions.has(mission.id)) {
+      return;
+    }
     setSelectedMission(mission);
   };
 
@@ -414,10 +417,10 @@ export const MissionsModal = ({
 
                   <TouchableOpacity
                     className={`mt-2 p-2 rounded-lg items-center ${
-                      isAnswered ? 'bg-green-500 opacity-50' : isCompleted ? 'bg-green-500' : 'bg-blue-500'
+                      isAnswered ? 'bg-gray-400' : isCompleted ? 'bg-green-500' : 'bg-blue-500'
                     }`}
                     onPress={() => handleCompleteMission(mission)}
-                    disabled={isLoading}
+                    disabled={isAnswered || isLoading}
                   >
                     <Text className="text-white font-bold">
                       {isAnswered ? '✅ Answered' : isCompleted ? '✅ Completed' : '📝 Answer'}
