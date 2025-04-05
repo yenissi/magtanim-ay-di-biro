@@ -173,22 +173,27 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
   
   try {
     const userId = Firebase_Auth.currentUser?.uid;
-    
-    // Calculate total sell value
     const totalSellValue = selectedNormalItems.reduce((total, itemId) => {
       const item = normalItems.find((item) => item.id === itemId);
       return total + (item ? item.sellPrice : 0);
     }, 0);
     
     if (userId) {
-      // Remove items from Firebase only - let listeners handle local state
       const updates = {};
       selectedNormalItems.forEach((itemId) => {
+        const item = normalItems.find((item) => item.id === itemId);
         updates[`users/${userId}/normalItems/${itemId}`] = null;
+
+        if (item) {
+          if (item.type === 'crop') {
+            onMissionProgress?.('sellCrop', { item });
+          } else if (item.type === 'tree') {
+            onMissionProgress?.('sellTree', { item });
+          }
+        }
       });
       await update(ref(Firebase_Database), updates);
-      
-      // Update statistics in Firebase
+
       const userStatsRef = ref(Firebase_Database, `users/${userId}/statistics`);
       const statsSnapshot = await get(userStatsRef);
       const currentStats = statsSnapshot.val() || { 
@@ -201,27 +206,32 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
       const updatedStats = {
         ...currentStats,
         itemsSold: (currentStats.itemsSold || 0) + selectedNormalItems.length,
-        moneyEarned: (currentStats.moneyEarned || 0) + totalSellValue // Add money earned to statistics
+        moneyEarned: (currentStats.moneyEarned || 0) + totalSellValue 
       };
       
       await update(userStatsRef, updatedStats);
       
-      // Update money in Firebase
       const userMoneyRef = ref(Firebase_Database, `users/${userId}/money`);
       await get(userMoneyRef).then((snapshot) => {
         const currentMoney = snapshot.exists() ? snapshot.val() : 0;
         set(userMoneyRef, currentMoney + totalSellValue);
       });
-      
-      // Don't call onRemoveItem here - let Firebase listeners handle it
     } else {
-      // If no user, update local state directly
       onUpdateMoney(totalSellValue);
-      selectedNormalItems.forEach(onRemoveItem);
-    }
-    
-    // Reset selection regardless of auth state
+      selectedNormalItems.forEach((itemId) => {
+        const item = normalItems.find((item) => item.id === itemId);
+        if (item) {
+          if (item.type === 'crop') {
+            onMissionProgress?.('sellCrop', { item });
+          } else if (item.type === 'tree') {
+            onMissionProgress?.('sellTree', { item });
+          }
+          onRemoveItem(itemId);
+        }
+      });
+    }    
     setSelectedNormalItems([]);
+    
     
     Alert.alert(
       'Sale Complete!',

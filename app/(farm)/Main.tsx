@@ -182,7 +182,6 @@ interface MissionProgress {
       newProgress.usedFertilizers = newProgress.usedFertilizers || {};
       newProgress.usedTools = newProgress.usedTools || {};
       newProgress.plantedSantan = newProgress.plantedSantan || 0;
-
       newProgress.plantedGumamela = newProgress.plantedGumamela || 0;
       newProgress.plantedOrchids = newProgress.plantedOrchids || 0;
       newProgress.plantedMangga = newProgress.plantedMangga || 0;
@@ -197,10 +196,10 @@ interface MissionProgress {
           break;
   
         case 'plantCrop':
+        if (details.cropType === 'Mangga') {
+          newProgress.plantedMangga += 1;
+        } else {
           newProgress.plantedCrops += 1;
-          console.log('Total planted crops:', newProgress.plantedCrops);
-
-          // Track specific crop types
           if (details.cropType === 'Santan') {
             newProgress.plantedSantan += 1;
             console.log('Planted Santan:', newProgress.plantedSantan);
@@ -210,10 +209,8 @@ interface MissionProgress {
           } else if (details.cropType === 'Orchids') {
             newProgress.plantedOrchids += 1;
             console.log('Planted Orchids:', newProgress.plantedOrchids);
-          } else if (details.cropType === 'Mangga') {
-            newProgress.plantedMangga += 1;
-            console.log('Planted Mangga:', newProgress.plantedMangga);
           }
+        }
           break;
   
         case 'harvestCrop':
@@ -238,7 +235,6 @@ interface MissionProgress {
   
         case 'sellTree':
           newProgress.soldTrees = (newProgress.soldTrees || 0) + 1;
-          console.log('Sold trees:', newProgress.soldTrees);
           break;
   
         case 'createOrganicFertilizer':
@@ -264,7 +260,7 @@ interface MissionProgress {
         }
         // Mangga-specific planting mission
         else if (mission.title === 'Mag tanim ng Mangga') {
-          isComplete = details?.cropType === 'Mangga' && newProgress.plantedCrops >= 1;
+          isComplete = newProgress.plantedMangga >= 1;
         }
         // Tool usage missions
         else if (mission.title === 'Gumamit ng Asarol') {
@@ -298,10 +294,10 @@ interface MissionProgress {
           isComplete = newProgress.plantedOrchids >= 1;
         }
         // Selling missions
-        else if (mission.title === 'Mag Benta ng Crops') {
+        else if (mission.title === 'Mag Harvest ng Crops') {
           isComplete = (newProgress.soldCrops || 0) >= 1;
         } 
-        else if (mission.title === 'Mag Benta ng Prutas') {
+        else if (mission.title === 'Mag Harvest ng Mangga') {
           isComplete = (newProgress.soldTrees || 0) >= 1;
         } 
         // Organic fertilizer creation mission
