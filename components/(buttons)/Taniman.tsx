@@ -55,15 +55,15 @@ const HARVEST_VALUES = {
   Papaya: { normal: 100, rotten: 0 },
 } as const;
 
-const INFESTATION_CHANCE = 0.01;
-const INFESTATION_CHECK_INTERVAL = 10000;
+const INFESTATION_CHANCE = 0.001;
+const INFESTATION_CHECK_INTERVAL = 300000;
 const DECAY_TIME = 300000;
 const FERTILIZER_GROWTH_MULTIPLIER = 0.5;
-const DROUGHT_CHANCE = 0.01;
-const DROUGHT_CHECK_INTERVAL = 10000;
+const DROUGHT_CHANCE = 0.001;
+const DROUGHT_CHECK_INTERVAL = 300000;
 const DROUGHT_DECAY_TIME = 30000;
-const FLOOD_CHANCE = 0.01;
-const FLOOD_CHECK_INTERVAL = 30000;
+const FLOOD_CHANCE = 0.0005;
+const FLOOD_CHECK_INTERVAL = 300000;
 
 // Tutorial Overlay Component
 const TutorialOverlay = ({ message, onNext, onClose, highlight }) => (
@@ -915,6 +915,9 @@ export const Taniman: React.FC<TanimanProps> = ({
           setPlots((current) => updatePlot(current, row, col, { plant: { ...plot.plant, hasInfestation: false } }));
           setTimeout(() => startInfestationCheck(row, col), 100);
           Alert.alert('Success!', 'The infestation has been treated.');
+          if (onMissionProgress) {
+            onMissionProgress('useTool', { tool: 'Chemical Pesticide' });
+          }
           playTimedSound(require('@/assets/sound/spray.mp3'));
           onUseItem(selectedItem);
           savePlantsToFirebase();

@@ -38,7 +38,6 @@ export const ProfileModal = ({
 
   const updateLeaderboard = async () => {
     try {
-      // Use Firebase_Database instead of database
       const usersSnapshot = await get(ref(Firebase_Database, 'users'));
       
       if (!usersSnapshot.exists()) {
@@ -63,7 +62,6 @@ export const ProfileModal = ({
         }
       });
       
-      // Write to leaderboard node
       await set(ref(Firebase_Database, 'leaderboard'), leaderboardData);
       console.log("Leaderboard updated successfully");
     } catch (error) {
@@ -72,24 +70,20 @@ export const ProfileModal = ({
   };
 
   useEffect(() => {
-    // Update the leaderboard when the component mounts
     updateLeaderboard();
   }, []);
 
   useEffect(() => {
     if (visible) {
-      // Reset states when modal opens
       setLoading(true);
       setError(null);
       fetchLeaderboardData();
     }
-  }, [visible, leaderboardTab]); // Add leaderboardTab as dependency
+  }, [visible, leaderboardTab]);
 
   const fetchLeaderboardData = async () => {
     try {
       console.log("Fetching user data for leaderboard...");
-  
-      // Read directly from the users node
       const dataRef = ref(Firebase_Database, 'users');
   
       onValue(dataRef, (snapshot) => {
@@ -171,24 +165,33 @@ export const ProfileModal = ({
       );
     }
 
-    // Sort users based on selected tab
-    const sortedUsers = [...leaderboardData].sort((a, b) => {
+    // Sort users based on selected tab and take only top 5
+    const sortedUsers = [...leaderboardData]
+      .sort((a, b) => {
+        if (leaderboardTab === 'plants') {
+          return b.statistics.plantsGrown - a.statistics.plantsGrown;
+        } else {
+          return b.statistics.moneyEarned - a.statistics.moneyEarned;
+        }
+      })
+      .slice(0, 5);
+
+    // Find current user's rank (even if not in top 5)
+    const allSortedUsers = [...leaderboardData].sort((a, b) => {
       if (leaderboardTab === 'plants') {
         return b.statistics.plantsGrown - a.statistics.plantsGrown;
       } else {
         return b.statistics.moneyEarned - a.statistics.moneyEarned;
       }
     });
-
-    // Find current user's rank
-    const currentUserRank = sortedUsers.findIndex(user => user.id === userData?.uid) + 1;
+    const currentUserRank = allSortedUsers.findIndex(user => user.id === userData?.uid) + 1;
 
     return (
       <View className="mt-2">
         <View className="flex-row mb-2 px-2 py-1 bg-orange-400 rounded-md">
-          <Text className=" font-bold text-xs"></Text>
-          <Text className="flex-1 font-bold text-xs">Rank Name</Text>
-          <Text className=" font-bold text-xs text-right">
+          <Text className="font-bold text-xs">Rank</Text>
+          <Text className="flex-1 font-bold text-xs">Name</Text>
+          <Text className="font-bold text-xs text-right">
             {leaderboardTab === 'plants' ? 'Plants Grown' : 'Money Earned'}
           </Text>
         </View>
@@ -232,7 +235,6 @@ export const ProfileModal = ({
     );
   };
 
-  // Show user's own statistics even if leaderboard is loading
   const renderUserStats = () => {
     const plantsGrown = userData?.statistics?.plantsGrown || 0;
     const moneyEarned = userData?.statistics?.moneyEarned || 0;
@@ -258,64 +260,56 @@ export const ProfileModal = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade">
-    <View className="flex-1 justify-center items-center bg-black/50">
-      <View className="bg-orange-300 p-5 rounded-lg w-[80%] border border-black max-h-[80%]">
-
-        {/* Wrap the main content in a ScrollView */}
-        <ScrollView>
-          <Text className="text-lg font-bold text-center">User Profile</Text>
-          <Pressable className="absolute right-1 top-5 p-2" onPress={onClose}>
-            <AntDesign name="close" size={20} color="black" />
-          </Pressable>
-          <View>
-            <View className="flex-row gap-4 mb-3">
-              <View className="items-center justify-center rounded-lg p-3 border-2 border-black">
-                <SimpleLineIcons name="user" size={44} color="black" />
-              </View>
-              <View>
-                <Text className="text-base text-black-600 font-light">FullName: {userData?.firstName} {userData?.lastName}</Text>
-                <Text className="text-base text-black-600 font-light">Grade Level: {gradeLevel}</Text>
-                <Text className="text-base text-black-600 font-light">School: {school}</Text>
+      <View className="flex-1 justify-center items-center bg-black/50">
+        <View className="bg-orange-300 p-5 rounded-lg w-[80%] border border-black max-h-[80%]">
+          <ScrollView>
+            <Text className="text-lg font-bold text-center">User Profile</Text>
+            <Pressable className="absolute right-1 top-5 p-2" onPress={onClose}>
+              <AntDesign name="close" size={20} color="black" />
+            </Pressable>
+            <View>
+              <View className="flex-row gap-4 mb-3">
+                <View className="items-center justify-center rounded-lg p-3 border-2 border-black">
+                  <SimpleLineIcons name="user" size={44} color="black" />
+                </View>
+                <View>
+                  <Text className="text-base text-black-600 font-light">FullName: {userData?.firstName} {userData?.lastName}</Text>
+                  <Text className="text-base text-black-600 font-light">Grade Level: {gradeLevel}</Text>
+                  <Text className="text-base text-black-600 font-light">School: {school}</Text>
+                </View>
               </View>
             </View>
-          </View>
 
-          {/* Statistics Section */}
-          {renderUserStats()}
+            {renderUserStats()}
 
-          {/* Leaderboard Section */}
-          <View className="border-2 border-black mt-3 rounded-lg p-2">
-            <Text className="text-base font-bold text-center">Leaderboard</Text>
-
-            {/* Tab Selector */}
-            <View className="flex-row mt-2">
-              <TouchableOpacity 
-                className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'plants' ? 'bg-orange-400' : 'bg-orange-200'}`}
-                onPress={() => setLeaderboardTab('plants')}
-              >
-                <Text className="text-center text-xs font-medium">Plants Grown</Text>
-              </TouchableOpacity>
-              <TouchableOpacity 
-                className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'money' ? 'bg-orange-400' : 'bg-orange-200'}`}
-                onPress={() => setLeaderboardTab('money')}
-              >
-                <Text className="text-center text-xs font-medium">Money Earned</Text>
-              </TouchableOpacity>
+            <View className="border-2 border-black mt-3 rounded-lg p-2">
+              <Text className="text-base font-bold text-center">Leaderboard</Text>
+              <View className="flex-row mt-2">
+                <TouchableOpacity 
+                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'plants' ? 'bg-orange-400' : 'bg-orange-200'}`}
+                  onPress={() => setLeaderboardTab('plants')}
+                >
+                  <Text className="text-center text-xs font-medium">Plants Grown</Text>
+                </TouchableOpacity>
+                <TouchableOpacity 
+                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'money' ? 'bg-orange-400' : 'bg-orange-200'}`}
+                  onPress={() => setLeaderboardTab('money')}
+                >
+                  <Text className="text-center text-xs font-medium">Money Earned</Text>
+                </TouchableOpacity>
+              </View>
+              {renderLeaderboard()}
             </View>
 
-            {renderLeaderboard()}
-          </View>
-
-          {/* Logout Button */}
-          <TouchableOpacity
-            className="bg-red-500 p-3 mt-4 rounded-md"
-            onPress={onSignOut}
-          >
-            <Text className="text-black text-center font-bold">Logout</Text>
-          </TouchableOpacity>
-        </ScrollView>
+            <TouchableOpacity
+              className="bg-red-500 p-3 mt-4 rounded-md"
+              onPress={onSignOut}
+            >
+              <Text className="text-black text-center font-bold">Logout</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
       </View>
-    </View>
-  </Modal>
+    </Modal>
   );
 };
