@@ -979,7 +979,10 @@ interface MissionProgress {
         {/* Modals */}
         <ShopModal
           visible={shopVisible}
-          onClose={() => setShopVisible(false)}
+          onClose={() => {
+            setShopVisible(false);
+            setHasVisitedShop(true); // Mark shop as visited when opened
+          }}
           uid={params.uid as string}
           userMoney={userMoney}
           onPurchase={() => {/* Refresh game data handled by useGameData */}}
@@ -1053,8 +1056,8 @@ interface MissionProgress {
           onAddToDecompose={handleAddToDecompose}
           onAddToNormalInventory={onAddToNormalInventory}
           onMissionProgress={handleMissionProgress}
-          // hasVisitedShop={hasVisitedShop} 
-          // onShopModalOpened={() => setHasVisitedShop(true)}
+          hasVisitedShop={hasVisitedShop} 
+          onShopModalOpened={() => setHasVisitedShop(true)}
         />
       </View>
     </ImageBackground>
