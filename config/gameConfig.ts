@@ -1,6 +1,6 @@
 export const INITIAL_GAME_STATE = {
     level: 1,
-    money: 10500,
+    money: 500,
     missions: [
       {
         id: 1,
