@@ -968,10 +968,10 @@ interface MissionProgress {
             onPress={() => setDecomposeVisible(true)}
         >
             <Image 
-              source={require('@/assets/images/decompose.png')}
-              className="w-12 h-12"
+              source={require('@/assets/images/harvestry.png')}
+              className="w-[34px] h-[34px]"
             />
-            <Text className="text-[10px] text-white font-medium ">Decompose</Text>
+            <Text className="text-[10px] text-white font-medium ">Harvest</Text>
           </TouchableOpacity>
 
         </View>

@@ -144,7 +144,7 @@ export const BagModal = ({
                 {safeInventory.map((item, index) => (
                   <View
                     key={`${item?.id || 'unknown'}-${index}`}
-                    className={`rounded-lg p-3 w-40 ${
+                    className={`rounded-lg p-3 w-40 items-center justify-between ${
                       selectedItem?.id === item?.id
                         ? 'bg-yellow-300 border-2 border-amber-500'
                         : 'bg-yellow-200'

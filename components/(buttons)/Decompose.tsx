@@ -372,9 +372,9 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
   return (
     <Modal animationType="fade" transparent={true} visible={visible} onRequestClose={onClose}>
       <View className="flex-1 justify-center items-center bg-black/50">
-        <View className="bg-orange-300 rounded-xl w-[100%] max-w-md h-[350px] p-2">
+        <View className="bg-orange-300 rounded-xl w-[100%] max-w-md h-[350px] p-3">
           <View className="flex-row justify-between items-center ">
-            <Text className="text-2xl font-bold text-brown-800">Composting Station</Text>
+            <Text className="text-2xl font-bold text-brown-800">Harvest Station</Text>
             <TouchableOpacity onPress={onClose} className="p-2">
               <Text className="text-xl font-bold text-brown-800">✕</Text>
             </TouchableOpacity>
@@ -403,7 +403,11 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
               className={`flex-1 p-2 rounded-tl-lg rounded-bl-lg ${activeTab === 'rotted' ? 'bg-brown-600' : 'bg-brown-400'}`}
             >
               <Text className={`text-center font-semibold ${activeTab === 'rotted' ? 'text-white' : 'text-brown-800'}`}>
-                Rotten Plants
+                <Image 
+                  source={require('@/assets/images/bulok.png')}
+                  className="w-[19px] h-[19px]"
+                />
+                 Rotten Plants
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -411,7 +415,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
               className={`flex-1 p-2 rounded-tr-lg rounded-br-lg ${activeTab === 'normal' ? 'bg-brown-600' : 'bg-brown-400'}`}
             >
               <Text className={`text-center font-semibold ${activeTab === 'normal' ? 'text-white' : 'text-brown-800'}`}>
-                Fresh Crops
+              🌱 Harvest Plants
               </Text>
             </TouchableOpacity>
           </View>
@@ -514,7 +518,7 @@ export const DecomposeModal: React.FC<DecomposeModalProps> = ({
               <TouchableOpacity
                 onPress={handleSellWithWarning}
                 disabled={selectedNormalItems.length === 0}
-                className={` p-3 rounded-lg ${
+                className={`p-3 rounded-lg ${
                   selectedNormalItems.length > 0 ? 'bg-green-600' : 'bg-gray-400'
                 }`}
               >

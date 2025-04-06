@@ -251,7 +251,7 @@ export const ProfileModal = ({
           <View className="items-center">
             <MaterialIcons name="monetization-on" size={20} color="gold" />
             <Text className="text-xs">Money Earned</Text>
-            <Text className="font-bold">₱{moneyEarned}</Text>
+            <Text className="font-bold">{moneyEarned}</Text>
           </View>
         </View>
       </View>

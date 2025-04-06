@@ -407,6 +407,7 @@ export const MissionsModal = ({
             {localMissions.map((mission) => {
               const isAnswered = answeredMissions.has(mission.id);
               const isCompleted = mission.completed;
+              const isLocked = !isAnswered && !isCompleted;
               return (
                 <View
                   key={mission.id}
@@ -417,13 +418,17 @@ export const MissionsModal = ({
 
                   <TouchableOpacity
                     className={`mt-2 p-2 rounded-lg items-center ${
-                      isAnswered ? 'bg-gray-400' : isCompleted ? 'bg-green-500' : 'bg-blue-500'
+                      isAnswered
+                        ? 'bg-gray-400'
+                        : isCompleted
+                        ? 'bg-green-500'
+                        : 'bg-gray-500'
                     }`}
                     onPress={() => handleCompleteMission(mission)}
-                    disabled={isAnswered || isLoading}
+                    disabled={isLocked || isAnswered || isLoading}
                   >
                     <Text className="text-white font-bold">
-                      {isAnswered ? '✅ Answered' : isCompleted ? '✅ Completed' : '📝 Answer'}
+                      {isAnswered ? '✅ Answered' : isCompleted ? '✅ Completed' : '🔒 Not Completed'}
                     </Text>
                   </TouchableOpacity>
 
