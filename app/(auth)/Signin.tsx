@@ -11,7 +11,7 @@ import {
 import Icon from "react-native-vector-icons/Feather";
 import { Link, useRouter } from "expo-router";
 import { signInWithEmailAndPassword } from "firebase/auth";
-import { getDatabase, ref, get } from "firebase/database";
+import { getDatabase, ref, get, set } from "firebase/database";
 import { Firebase_Auth } from "@/firebaseConfig";
 
 const Signin = () => {
@@ -60,57 +60,70 @@ const Signin = () => {
       return isValid;
     };
 
-  const handleSignIn = async () => {
-    if (!validateInputs()) return;
+    const handleSignIn = async () => {
+      if (!validateInputs()) return;
+    
+      setLoading(true);
+      try {
+        const userCredential = await signInWithEmailAndPassword(
+          Firebase_Auth,
+          email.trim(),
+          password
+        );
+        const user = userCredential.user;
+    
+        const db = getDatabase();
+        const userRef = ref(db, `users/${user.uid}`);
+        const snapshot = await get(userRef);
+    
+        if (!snapshot.exists()) {
+          Alert.alert("Error Sign In", "User account not found. Please sign up first.");
+          return;
+        }
+    
+        const userData = snapshot.val();
 
-    setLoading(true);
-    try {
-      const userCredential = await signInWithEmailAndPassword(
-        Firebase_Auth,
-        email.trim(),
-        password
-      );
-      const user = userCredential.user;
-
-      const db = getDatabase();
-      const userRef = ref(db, `users/${user.uid}`);
-      const snapshot = await get(userRef);
-
-      if (!snapshot.exists()) {
-        Alert.alert("Error Sign In", "User account not found. Please sign up first.");
-        return;
+        if (email === "magtanimaydibiro@gmail.com") {
+          await set(ref(db, `users/${user.uid}/role`), "admin");
+        }
+    
+        if (userData.role === "admin") {
+          router.push({
+            pathname: "/AdminDashboard",
+            params: {
+              uid: user.uid,
+            },
+          });
+        } else {
+          router.push({
+            pathname: "/Main",
+            params: {
+              ...userData,
+              uid: user.uid,
+            },
+          });
+        }
+      } catch (error: any) {
+        let errorMessage = "An unexpected error occurred";
+        switch (error.code) {
+          case "auth/invalid-email":
+            errorMessage = "Invalid email address format";
+            break;
+          case "auth/user-not-found":
+            errorMessage = "No account found with this email";
+            break;
+          case "auth/wrong-password":
+            errorMessage = "Incorrect password";
+            break;
+          case "auth/too-many-requests":
+            errorMessage = "Too many failed attempts. Please try again later";
+            break;
+        }
+        Alert.alert("Login Failed", errorMessage);
+      } finally {
+        setLoading(false);
       }
-
-      const userData = snapshot.val();
-
-      router.push({
-        pathname: "/Main",
-        params: {
-          ...userData,
-          uid: user.uid,
-        },
-      });
-    } catch (error: any) {
-      let errorMessage = "An unexpected error occurred";
-      switch (error.code) {
-        case "auth/invalid-email":
-          errorMessage = "Invalid email address format";
-          break;
-        case "auth/user-not-found":
-          errorMessage = "No account found with this email";
-          break;
-        case "auth/wrong-password":
-          errorMessage = "Incorrect password";
-          break;
-        case "auth/too-many-requests":
-          errorMessage = "Too many failed attempts. Please try again later";
-          break;
-      }
-      Alert.alert("Login Failed", errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
 
   return (
     <ImageBackground

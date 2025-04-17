@@ -39,7 +39,9 @@ export const BagModal = ({
   useEffect(() => {
     if (Array.isArray(inventory) && inventory.length > 0) {
       console.log('', inventory.map(item => ({
+        id: item.id,
         title: item.title,
+        image: item.image,
       })));
     }
   }, [inventory]);
@@ -85,7 +87,6 @@ export const BagModal = ({
     const isSelected = selectedItem?.id === item.id;
 
     if (item.title === '' || item.title === 'Itak') {
-      // Tools like Itak only have Select/Unselect
       return (
         <TouchableOpacity
           className={`rounded-lg p-2 w-full ${isSelected ? 'bg-red-400' : 'bg-green-400'}`}
@@ -112,7 +113,6 @@ export const BagModal = ({
       );
     }
 
-    // Consumable items (seeds, fertilizer, etc.) get Select/Unselect
     return (
       <TouchableOpacity
         className={`rounded-lg p-2 w-full ${isSelected ? 'bg-red-400' : 'bg-green-400'}`}

@@ -9,12 +9,19 @@ import {
   ScrollView,
 } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
-import { ref, set } from "firebase/database";
+import { getDatabase, ref, set } from "firebase/database";
 import { Firebase_Auth, Firebase_Database } from "@/firebaseConfig";
 import { useRouter } from "expo-router";
 import Icon from "react-native-vector-icons/Feather";
 import { Link } from "expo-router";
 import { INITIAL_GAME_STATE } from "@/config/gameConfig";
+
+
+const setAdminRole = async (uid: string) => {
+  const db = getDatabase();
+  await set(ref(db, `users/${uid}/role`), "admin");
+  console.log("Admin role set!");
+};
 
 const Signup = () => {
   const [userEmail, setUserEmail] = useState<string>("");
@@ -113,7 +120,6 @@ const Signup = () => {
 
   const handleSignUp = async () => {
     if (!validateInputs()) return;
-
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -129,9 +135,15 @@ const Signup = () => {
         email: userEmail.trim(),
         gradeLevel,
         school: selectedSchool,
+        gender: selectedGender,
+        role: "user",
         createdAt: new Date().toISOString(),
         ...INITIAL_GAME_STATE,
       });
+
+      if (user.uid === "BAHj5UKfdaSfdoYbS34gxwLkefL2") {
+        await setAdminRole(user.uid);
+      }
 
       Alert.alert("Success", "Account created successfully!", [
         { text: "OK", onPress: () => router.push("/Signin") },

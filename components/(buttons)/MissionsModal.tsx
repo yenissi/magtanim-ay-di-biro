@@ -197,7 +197,7 @@ export const MissionsModal = ({
   };
 
   const getRemark = (score: any, category: string) => {
-    const normalizedScore = Math.round(Number(score)); // Convert to number and round to nearest integer
+    const normalizedScore = Math.round(Number(score)); 
     if (isNaN(normalizedScore) || normalizedScore < 1 || normalizedScore > 5) {
       return "Invalid score.";
     }
@@ -336,28 +336,28 @@ export const MissionsModal = ({
               <ScrollView className="max-h-64">
                 <View className="mb-4">
                   <Text className="font-bold ">Knowledge</Text>
-                  <Text>Score: {answerData.scores.Knowledge_Agriculture_Score}/5</Text>
+                  <Text>Score: {Math.round(answerData.scores.Knowledge_Agriculture_Score)}/5</Text>
                   <Text className="text-sm text-gray-600">
-                    Remark: {getRemark(answerData.scores.Knowledge_Agriculture_Score, 'Knowledge')}
+                    Remark: {getRemark(Math.round(answerData.scores.Knowledge_Agriculture_Score), 'Knowledge')}
                   </Text>
                 </View>
                 <View className="mb-4">
                   <Text className="font-bold ">Awareness</Text>
-                  <Text>Score: {answerData.scores.Awareness_Local_Agriculture_Score}/5</Text>
+                  <Text>Score: {Math.round(answerData.scores.Awareness_Local_Agriculture_Score)}/5</Text>
                   <Text className="text-sm text-gray-600">
-                    Remark: {getRemark(answerData.scores.Awareness_Local_Agriculture_Score, 'Awareness')}
+                    Remark: {getRemark(Math.round(answerData.scores.Awareness_Local_Agriculture_Score), 'Awareness')}
                   </Text>
                 </View>
                 <View className="mb-4">
                   <Text className="font-bold ">Examples</Text>
-                  <Text>Score: {answerData.scores.Use_of_Example_Data_Score}/5</Text>
+                  <Text>Score: {Math.round(answerData.scores.Use_of_Example_Data_Score)}/5</Text>
                   <Text className="text-sm text-gray-600">
-                    Remark: {getRemark(answerData.scores.Use_of_Example_Data_Score, 'Examples')}
+                    Remark: {getRemark(Math.round(answerData.scores.Use_of_Example_Data_Score), 'Examples')}
                   </Text>
                 </View>
                 <View>
                   <Text className="font-bold ">Average</Text>
-                  <Text>Score: {answerData.scores.Average_Score}/5</Text>
+                  <Text>Score: {Math.round(answerData.scores.Average_Score)}/5</Text>
                 </View>
               </ScrollView>
             ) : (

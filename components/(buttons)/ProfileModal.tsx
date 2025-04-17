@@ -36,18 +36,20 @@ export const ProfileModal = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Function to update leaderboard (admin only)
   const updateLeaderboard = async () => {
+    if (userData?.role !== "admin") return; // Only admin can update
+
     try {
       const usersSnapshot = await get(ref(Firebase_Database, 'users'));
-      
       if (!usersSnapshot.exists()) {
         console.log("No users data found");
         return;
       }
-      
+
       const users = usersSnapshot.val();
-      const leaderboardData = {};
-      
+      const leaderboardData: { [key: string]: any } = {};
+
       Object.keys(users).forEach(userId => {
         const user = users[userId];
         if (user.firstName && user.lastName) {
@@ -56,12 +58,12 @@ export const ProfileModal = ({
             lastName: user.lastName,
             statistics: {
               plantsGrown: user.statistics?.plantsGrown || 0,
-              moneyEarned: user.statistics?.moneyEarned || 0
-            }
+              moneyEarned: user.statistics?.moneyEarned || 0,
+            },
           };
         }
       });
-      
+
       await set(ref(Firebase_Database, 'leaderboard'), leaderboardData);
       console.log("Leaderboard updated successfully");
     } catch (error) {
@@ -70,8 +72,10 @@ export const ProfileModal = ({
   };
 
   useEffect(() => {
-    updateLeaderboard();
-  }, []);
+    if (visible && userData?.role === "admin") {
+      updateLeaderboard(); // Update leaderboard only if admin
+    }
+  }, [visible]);
 
   useEffect(() => {
     if (visible) {
@@ -83,15 +87,16 @@ export const ProfileModal = ({
 
   const fetchLeaderboardData = async () => {
     try {
-      console.log("Fetching user data for leaderboard...");
-      const dataRef = ref(Firebase_Database, 'users');
-  
-      onValue(dataRef, (snapshot) => {
-        try {
+      console.log("Fetching leaderboard data...");
+      const dataRef = ref(Firebase_Database, 'leaderboard'); // Use /leaderboard instead of /users
+
+      onValue(
+        dataRef,
+        (snapshot) => {
           if (snapshot.exists()) {
             const data = snapshot.val();
             const users: LeaderboardUser[] = [];
-  
+
             Object.keys(data).forEach((userId) => {
               const user = data[userId];
               if (user.firstName && user.lastName) {
@@ -99,7 +104,7 @@ export const ProfileModal = ({
                   plantsGrown: user.statistics?.plantsGrown || 0,
                   moneyEarned: user.statistics?.moneyEarned || 0,
                 };
-  
+
                 users.push({
                   id: userId,
                   firstName: user.firstName,
@@ -108,23 +113,19 @@ export const ProfileModal = ({
                 });
               }
             });
-  
+
             setLeaderboardData(users);
           } else {
             setLeaderboardData([]);
           }
-  
           setLoading(false);
-        } catch (innerError) {
-          console.error("Error processing snapshot data:", innerError);
-          setError("Error processing data");
+        },
+        (dbError) => {
+          console.error("Firebase onValue error:", dbError);
+          setError(`Database error: ${dbError.message}`);
           setLoading(false);
         }
-      }, (dbError) => {
-        console.error("Firebase onValue error:", dbError);
-        setError(`Database error: ${dbError.message}`);
-        setLoading(false);
-      });
+      );
     } catch (outerError) {
       console.error("Unexpected error in fetchLeaderboardData:", outerError);
       setError("Unexpected error occurred");
@@ -147,7 +148,7 @@ export const ProfileModal = ({
         <View className="h-36 items-center justify-center">
           <MaterialIcons name="error-outline" size={24} color="red" />
           <Text className="mt-2">{error}</Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             className="mt-2 bg-orange-400 px-3 py-1 rounded-md"
             onPress={fetchLeaderboardData}
           >
@@ -165,25 +166,19 @@ export const ProfileModal = ({
       );
     }
 
-    // Sort users based on selected tab and take only top 5
     const sortedUsers = [...leaderboardData]
-      .sort((a, b) => {
-        if (leaderboardTab === 'plants') {
-          return b.statistics.plantsGrown - a.statistics.plantsGrown;
-        } else {
-          return b.statistics.moneyEarned - a.statistics.moneyEarned;
-        }
-      })
+      .sort((a, b) =>
+        leaderboardTab === 'plants'
+          ? b.statistics.plantsGrown - a.statistics.plantsGrown
+          : b.statistics.moneyEarned - a.statistics.moneyEarned
+      )
       .slice(0, 5);
 
-    // Find current user's rank (even if not in top 5)
-    const allSortedUsers = [...leaderboardData].sort((a, b) => {
-      if (leaderboardTab === 'plants') {
-        return b.statistics.plantsGrown - a.statistics.plantsGrown;
-      } else {
-        return b.statistics.moneyEarned - a.statistics.moneyEarned;
-      }
-    });
+    const allSortedUsers = [...leaderboardData].sort((a, b) =>
+      leaderboardTab === 'plants'
+        ? b.statistics.plantsGrown - a.statistics.plantsGrown
+        : b.statistics.moneyEarned - a.statistics.moneyEarned
+    );
     const currentUserRank = allSortedUsers.findIndex(user => user.id === userData?.uid) + 1;
 
     return (
@@ -195,17 +190,17 @@ export const ProfileModal = ({
             {leaderboardTab === 'plants' ? 'Plants Grown' : 'Money Earned'}
           </Text>
         </View>
-        
         <ScrollView className="h-36 border border-black-400 rounded-md">
           {sortedUsers.map((user, index) => {
             const isCurrentUser = user.id === userData?.uid;
-            const value = leaderboardTab === 'plants' 
-              ? user.statistics.plantsGrown 
-              : `₱${user.statistics.moneyEarned}`;
-            
+            const value =
+              leaderboardTab === 'plants'
+                ? user.statistics.plantsGrown
+                : `₱${user.statistics.moneyEarned}`;
+
             return (
-              <View 
-                key={user.id} 
+              <View
+                key={user.id}
                 className={`flex-row items-center px-2 py-1 border-b border-black-200 ${isCurrentUser ? 'bg-black-100' : ''}`}
               >
                 <View className="w-10">
@@ -223,7 +218,6 @@ export const ProfileModal = ({
             );
           })}
         </ScrollView>
-        
         {userData?.uid && (
           <View className="mt-1 bg-orange-50 p-1 rounded-md border border-orange-300">
             <Text className="text-xs text-center">
@@ -238,7 +232,7 @@ export const ProfileModal = ({
   const renderUserStats = () => {
     const plantsGrown = userData?.statistics?.plantsGrown || 0;
     const moneyEarned = userData?.statistics?.moneyEarned || 0;
-    
+
     return (
       <View className="border-2 border-black mt-1 rounded-lg p-2">
         <Text className="text-base font-bold text-center">Your Statistics</Text>
@@ -273,7 +267,9 @@ export const ProfileModal = ({
                   <SimpleLineIcons name="user" size={44} color="black" />
                 </View>
                 <View>
-                  <Text className="text-base text-black-600 font-light">FullName: {userData?.firstName} {userData?.lastName}</Text>
+                  <Text className="text-base text-black-600 font-light">
+                    FullName: {userData?.firstName} {userData?.lastName}
+                  </Text>
                   <Text className="text-base text-black-600 font-light">Grade Level: {gradeLevel}</Text>
                   <Text className="text-base text-black-600 font-light">School: {school}</Text>
                 </View>
@@ -285,14 +281,18 @@ export const ProfileModal = ({
             <View className="border-2 border-black mt-3 rounded-lg p-2">
               <Text className="text-base font-bold text-center">Leaderboard</Text>
               <View className="flex-row mt-2">
-                <TouchableOpacity 
-                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'plants' ? 'bg-orange-400' : 'bg-orange-200'}`}
+                <TouchableOpacity
+                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${
+                    leaderboardTab === 'plants' ? 'bg-orange-400' : 'bg-orange-200'
+                  }`}
                   onPress={() => setLeaderboardTab('plants')}
                 >
                   <Text className="text-center text-xs font-medium">Plants Grown</Text>
                 </TouchableOpacity>
-                <TouchableOpacity 
-                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${leaderboardTab === 'money' ? 'bg-orange-400' : 'bg-orange-200'}`}
+                <TouchableOpacity
+                  className={`flex-1 p-2 rounded-tl-md rounded-tr-md ${
+                    leaderboardTab === 'money' ? 'bg-orange-400' : 'bg-orange-200'
+                  }`}
                   onPress={() => setLeaderboardTab('money')}
                 >
                   <Text className="text-center text-xs font-medium">Money Earned</Text>

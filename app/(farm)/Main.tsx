@@ -448,7 +448,6 @@ interface MissionProgress {
         setPlots(userData.plotsState || plots);
       }
     });
-    
     return () => unsubscribe();
   }, [params.uid]);
 
@@ -596,21 +595,13 @@ interface MissionProgress {
       console.log("Cannot save plots state: User ID is missing");
       return;
     }
-    
     try {
-      // console.log("Saving plots state to Firebase...");
-      
-      // Create a deep copy of the plots array to avoid reference issues
       const plotsToSave = JSON.parse(JSON.stringify(plots));
-      
-      // Process each plot to ensure there are no undefined values
-      // Firebase doesn't handle undefined values well
       const sanitizedPlotsState = plotsToSave.map(row => 
         row.map(plot => ({
           isPlowed: plot.isPlowed || false,
           isWatered: plot.isWatered || false,
           isFlooded: plot.isFlooded || false,
-          // Only include plant data if it exists
           ...(plot.plant ? {
             plant: {
               id: plot.plant.id,
@@ -628,13 +619,9 @@ interface MissionProgress {
           } : {})
         }))
       );
-    
-      // Save to Firebase
       await update(ref(Firebase_Database, `users/${params.uid}`), {
         plotsState: sanitizedPlotsState,
       });
-    
-      // console.log("Plots state saved successfully!");
       return true;
     } catch (error) {
       console.error("Error saving plots state:", error);
